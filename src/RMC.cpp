@@ -5,6 +5,8 @@
 #include <gecode/minimodel.hh>
 #include <gecode/driver.hh>
 
+#include <gecode/gist.hh>
+
 #include <iostream>
 #include <vector>
 
@@ -158,6 +160,7 @@ int main(int argc, char** argv) {
   
   RMC *rmc = new RMC(input);
   
+  Gist::bab(rmc);
   BAB<RMC> bab(rmc);
   
   delete rmc;
