@@ -1,0 +1,207 @@
+Structure
+---------
+
+- Order
+    - OrderCode: String
+    - ConstructionYard
+	- ConstructionYardCode: String
+	- WaitingMinutes: Number
+	- StationDurations
+	    - StationDuration: 
+		- StationCode: String
+		- DrivingMinutes: Number
+		- Direction: From|To
+    - PumpLineLengthRequired: Number, >= 0
+    - From: Date+Time
+    - totalVolumeM3: Float
+    - RequiredDischargeM3PerHour: Float
+    - PreferredStationCode: String
+    - MaximumVolumneAllowed: true|false
+    d IsPickup: false|
+    d Priority: Number, >= 0
+
+- Vehicle:
+    - VehicleCode: String
+    d VehicleType: Pump|
+    - PumpLineLength: Number, >= 0
+    - NormalVolumne: Number, >= 0
+    - MaximumVolumne: Number, >= 0
+    - DischargeM3PerHour: Number
+    - NextAvailableStartDateTime: Date+Time
+- Station:
+    - StationCode: String
+    - LoadingMinutes: Number
+
+Preprocessing
+-------------
+- Set MaximumVolume = NormalVolume if one of them is not set
+- Ignore trucks with neither Max or Normal Volume??
+- All Timestamps: get minimum time, calculate in minutes from minimum time.
+
+Constants, Constant Arrays
+--------------------------
+- Units
+  - All times t_* in minutes since T0
+  - All delta times dT_* in minutes
+  - All rates in m3/minute
+  - All volumes in m3
+
+- dT_max: Maximum RMC life time
+- Alpha1, Alpha2, Alpha3, Alpha4, Alpha5: Weights
+
+- dT_Inf = INT_MAX: Large value to set to (improve: set to upper_bound(cost))
+
+- O_totalVolume[O]: total volumne to pour
+- O_reqDischargeRate[O]: DischargeRate per Minute 
+  O_reqDischargeRate[O] = Order.ReqiredDischargeRateM3PerHour / 60.0
+- O_reqPumpLineLength[O]: Minimum pump line length
+- O_prefStation[O]: Preferred Station index, -1 if no preferred station
+
+- O_V_volume[O, i]: Volume of vehicle i for order O
+  O_V_volume[O, i] = Order.MaximumVolumeAllowed ? V[i].MaximumVolume : V[i].NormalVolume;
+
+- O_totalVolume[O]: Total volume to pour for order O
+
+- O_t_start[O]: Required start time of order O
+
+- dT_from[O, S]: Delta Time to travel from station S to yard O.CY for order O
+  - Invalid trips are set to dT_Inf
+- dT_return[O, S]: Delta Time to travel from yard O.CY back to station S for order O
+  - Invalid trips are set to dT_Inf
+- dT_setup[O]: Delta Time for setting up truck at CY for order O
+
+- V_pumpLineLength[i]: Pump length of vehicle V
+- V_dischargeRate[i]: max discharge rate in m3/minutes
+- V_t_available[i]: time stamp since when Vehicle is available
+
+- dT_load[S]: Delta time to load a vehicle at station S
+
+Data Structure
+--------------
+- Delivery D_i[d] for Vehicle V_i:
+  - D_i[d].order: Order
+  - D_i[d].station: Index of start station
+  - D_i[d].t_load: Time stamp of start of loading at station
+  - D_i[d].t_unload: Time stamp of start of unloading at CY
+
+- d_max[i]: Number of deliveries for V_i
+
+- cost: Cost optimization variable
+
+Helper Variables, Constaints
+----------------------------
+- D_i[d].dT_unloading: delta time to unload vehicle V_i for delivery d completely
+  D_i[d].dT_unloading = O_volume[ D_i[d].order, i ] / O_reqDischargeRate[ D_i[d].order ]
+
+- D_i[d].t_arrival: time stamp of arrival of vehicle i at CY
+  D_i[d].t_arrival = D_i[d].t_load + dT_load[ D_i[d].station ] + dT_From[ D_i[d].order, D_i[d].station ]
+
+- D_i[d].t_setup: time stamp when setting up vehicle i at CV
+  D_i[d].t_setup = D_i[d].t_unload - dT_setup[ D_i[d].order ]
+
+- Constraint: Vehicle can only be used after some time
+  for all i: D_i[0].t_load >= V_t_available[i]
+
+- Constraint: Vehicles must arrive before setting it up
+  for all i, d: D_i[d].t_arrival <= D_i[d].t_setup		
+
+- Constraint: Vehicle can only be loaded after it arrived at a station
+  for all i: 
+    for all d in [1..d_max[i]]: 
+      D_i[d-1].t_unload + D_i[d-1].dT_unloading + dT_return[ D_i[d-1].order, D_i[d].station ] <= D_i[d].load
+
+- Constraint: unloading should not start too early
+  for all i, d: D_i[d].t_unload >= O_t_start[ D_i[d].order ]
+
+- D_i[d].volume: Volume poured by delivery d by vehicle V_i (not including size of order!)
+  D_i[d].volume = min( O_V_volume[ D_i[d].order, i ], (dT_max - (D_i[d].t_unload - D_i[d].t_load)) * O_reqDischargeRate[ D_i[d].order ] )
+
+- D_i[d].waste: Concrete wasted by delivery d by vehicle V_i (not including size of order!)
+  D_i[d].waste = O_V_volume[ D_i[d].order ] - D_i[d].volume
+
+- O_waste[O]: Concrete wasted by order O
+  O_waste[O] = 
+
+
+  
+
+Output
+------
+- Required
+  - cost: Total cost for all orders, optimization target
+  - t_total: Total time to complete all orders
+    t_total = max(for all V_i: D_i[d_max[i]-1].t_unload + D_i[d_max[i]-1].dT_unloading + 
+                               min(for all S_j: dT_return[D_i[d_max[i]-1].order, S_j]))
+  - t_runtime: Runtime in seconds of solver
+  - fails: Number of failures in propagation
+- Optional
+  - List of all deliveries:
+    - Order
+    - Vehicle
+    - Start Station, time to start loading
+    - Construction Site, time to start unloading
+
+
+Constaints per Model
+--------------------
+
+- Each vehicle exists only once
+  - D_v: simple (load time >= arrival at next station time)
+  - D_o: check overlaps of all deliveries per vehicle, or define sorted list of travels per vehicle
+         requires time to travel from/to prev/next station!!
+- Each vehicle follows a tour
+  - D_v: implicit
+  - D_o: implicit
+- Each station only loads at most one vehicle
+  - D_v: check overlaps for all deliveries with load time
+  - D_o: check overlaps for all deliveries with load time
+- Each CY unloads at most one vehicle
+  - D_v: check overlaps of all deliveries per CY with unloading time
+  - D_o: simple
+
+- Calculate time to return to next station
+  - D_v: simple
+  - D_o: 
+
+- Calculate waste/volume poured per order
+  - D_v: sum over all delivieries, select per order
+  - D_o: simple sum
+- Calculate lateness of first delivery
+  - D_v: Sort deliverlies per order, get array with unloading times of vehicles, get first value
+         or get minimum of all unloading times of all vehicles for order O
+  - D_o: simple
+- Calculate time lag per delivery per order
+  - D_v: Sort deliverlies per order, get array with unloading times of vehicles
+  - D_o: simple
+- Calculate travel time of all vehicles
+  - D_v: simple
+  - D_o: needs end station per delivery
+
+Constraints (informal, old)
+---------------------------
+- Each V exists only once
+- Each V starts at Station 1
+- Each V has to end at a Station
+- Each V must continue from where it ended up in the last time slot
+- Order of actions per V is: Load at S, Travel to CY, Wait if busy, Setup, Unload, travel to S
+- V.DischargeM3PerHour >= Order.RequiredDischargeM3PerHour
+- V.PumpLineLength >= Order.PumpLineLengthRequired
+- Each station can load at most one V at a time
+- Each CY can only unload one V at a time
+
+- Volumne of V_i for Order O_k: v_ik = (O_k.MaximumVolumeAllowed ? V_i.MaximumVolume : V_i.NormalVolume)
+
+- Time to start loading for V_i: V_i.t_start_load
+- Time to start unloading for V_i: V_i.t_start_unload
+
+- Time to start driving for V_i: V_i.T_start_load + t_load_j
+
+- Delta Time to load V_i at S_j: t_load_j = S_j.LoadingMinutes
+- Delta Time from S_i to CY_j for Order O_k: t_travel_ijk  = O_k.CY_j.S_i.From.Duration
+- Delta Time to wait if busy: t_wait = <implicit>
+- Delta Time to setup V_i at CY_j for Order O_k: t_setup_jk = O_k.CY_j.WaitingMinutes
+- Delta Time to unload V_i at CY_j for Order O_k: t_unload_ijk = v_ik / O_k.RequiredDischargePerHour
+- Delta Time to travel back to S_i: t_back_ijk = O_k.CY_j.S_i.To.Duration
+
+- Concrete delivered by V_i at CY_j for O_k: v_delivered_ijk = min(v_ik, v_i.t_
+
