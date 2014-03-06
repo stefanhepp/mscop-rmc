@@ -11,6 +11,8 @@
 #include "ReadXML.hpp"
 
 #include <ctime>
+#include <cmath>
+
 
 int RMCInput::getStation(const char *code) const
 {
@@ -35,9 +37,13 @@ void RMCInput::setTimesForOrder(Order* order, XMLOrder& xmlorder)
       if (ite->_direction == true) {
         //order->setToYard(idx, (ite->_drivingMinutes==0? 32000 : ite->_drivingMinutes));
         order->setToYard(idx, ite->_drivingMinutes);
+        
+        _maxTravelTime = std::max(_maxTravelTime, ite->_drivingMinutes);
       } else {
         //order->setFromYard(idx, (ite->_drivingMinutes==0? 32000 : ite->_drivingMinutes));
         order->setFromYard(idx, ite->_drivingMinutes);
+        
+        _maxTravelTime = std::max(_maxTravelTime, ite->_drivingMinutes);
       }
     }
   }
@@ -55,7 +61,7 @@ void RMCInput::loadProblem(char* filename) {
   xmlReader->getVehiclesList(vehicleList);
   xmlReader->getStationsList(stationList);
 
-  xmlReader->print();
+  //xmlReader->print();
   
   //compute the base time stamp
   _baseTimeStamp = orderList[0]._unixTimeStamp;
@@ -76,6 +82,12 @@ void RMCInput::loadProblem(char* filename) {
   _vehicles.clear();
   _orders.clear();
   
+  _maxTravelTime = 0;
+  _maxDeliveries = 0;
+  _maxTimeStamp = 0;
+  
+  int maxLoadTime = 0;
+  
   // load stations
   for(int i = 0 ; i < stationList.size(); i++) {
     XMLStation &station = stationList[i];
@@ -85,6 +97,8 @@ void RMCInput::loadProblem(char* filename) {
     _stationCodes.insert( std::pair<std::string,int>(std::string(station._stationCode), _stations.size()) );
     
     _stations.push_back( new Station(station._stationCode, station._loadingMinutes) );
+    
+    maxLoadTime = std::max(maxLoadTime, station._loadingMinutes);
   }
   
   //treat each of the cars
@@ -116,6 +130,42 @@ void RMCInput::loadProblem(char* filename) {
     _orders.push_back(o);
   }
 
+  // TODO make this more tight! (i.e., use a greedy alg. to assign yards to trucks
+  
+  // find the smallest vehicle capacity
+  float minCapacity = _vehicles[0]->volume(false);
+  for (int i = 1; i < _vehicles.size(); i++) {
+    minCapacity = std::min(minCapacity, _vehicles[i]->volume(false));
+  }
+  
+  // count how many deliveries are needed at most for all orders
+  for (int i = 0; i < _orders.size(); i++) {
+    Order &order = *_orders[i];
+    
+    float volume = order.totalVolume();
+    int deliveries = ceil( volume / minCapacity );
+    
+    int timeDelivery = maxLoadTime + 2 * _maxTravelTime + order.dTimeSetup() 
+                     + ceil(minCapacity / order.dischargeRate());
+    
+    _maxDeliveries += deliveries;
+    
+    _maxTimeStamp = std::max(_maxTimeStamp, order.timeStart());
+    _maxTimeStamp += deliveries * timeDelivery;
+  }
+  
+  buildValueArrays();
 }
 
+void RMCInput::buildValueArrays()
+{
+  _orderStartTimes = new int[_orders.size()];
+  
+  for (int i = 0; i < _orders.size(); i++) {
+    Order *o = _orders[i];
+    _orderStartTimes[i] = o->timeStart();
+  }
+  
+  
+}
 

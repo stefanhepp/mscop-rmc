@@ -1,3 +1,9 @@
+build
+src/.kdev4
+src/src.kdev4
+
+.*.swp
+
 # Compiled Object files
 *.slo
 *.lo

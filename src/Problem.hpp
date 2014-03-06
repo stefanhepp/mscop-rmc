@@ -14,6 +14,9 @@
 #include <vector>
 #include <map>
 
+
+static const int MAX_TRAVEL_TIME = 5000000;
+
 class Order {
 public:
   Order(char *name, float vol, float dischargeRate, int pumpLength, int preferredStation,
@@ -24,8 +27,8 @@ public:
     _startTime(startTime), _setupTime(setupTime), _maxVolumeAllowed(maxVolumeAllowed)
   {  
     for(int i = 0; i < numStations; i++){
-      _dTimeFromStations.push_back(5000000);
-      _dTimeToStations.push_back(5000000);
+      _dTimeFromStations.push_back(MAX_TRAVEL_TIME);
+      _dTimeToStations.push_back(MAX_TRAVEL_TIME);
     }
   }
   
@@ -101,7 +104,7 @@ public:
     return _maxDischargeRate;
   }
   
-  int volume(bool maxVolume) {
+  float volume(bool maxVolume) {
     if (_maxVolume == _normalVolume) {
       return _maxVolume;
     }
@@ -154,6 +157,29 @@ public:
   
   void loadProblem(char *filename);
   
+  int getTimeMax() { return 100; }
+  
+  int getAlpha1() { return 10; }
+  
+  int getAlpha2() { return 10; }
+  
+  int getAlpha3() { return 1; }
+ 
+  int getAlpha4() { return 20; }
+  
+  int getAlpha5() { return 20; }
+  
+  
+  int getNumVehicles() const { return _vehicles.size(); }
+  
+  int getNumStations() const { return _stations.size(); }
+  
+  int getNumOrders() const { return _orders.size(); }
+  
+  int getMaxDeliveries() const { return _maxDeliveries; }
+  
+  int getMaxTimeStamp() const { return _maxTimeStamp; }
+  
   int getStation(const char *code) const;
   
   const std::vector<Order*>& getOrders() { return _orders; }
@@ -162,8 +188,20 @@ public:
   
   const std::vector<Station*>& getStations() { return _stations; }
   
+  Order &getOrder(int idx) { return *_orders[idx]; }
+  
+  Vehicle &getVehicle(int idx) { return *_vehicles[idx]; }
+  
+  Station &getStation(int idx) { return *_stations[idx]; }
+  
+
+  const int* getOrderStartTimes() { return _orderStartTimes; }  
+
+  
 private:
   void setTimesForOrder(Order *order, XMLOrder &xmlorder);
+  
+  void buildValueArrays();
   
   std::vector<Order*> _orders;
   std::vector<Vehicle*> _vehicles;
@@ -171,7 +209,14 @@ private:
   
   std::map<std::string, int> _stationCodes;
   
+  int _maxDeliveries;
+  int _maxTimeStamp;
+  int _maxTravelTime;
+  
   time_t _baseTimeStamp;
+  
+  // Arrays 
+  int* _orderStartTimes;
 };
 
 class RMCOutput {
