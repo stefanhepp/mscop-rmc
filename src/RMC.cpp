@@ -54,47 +54,74 @@ public:
     int numV = input.getNumVehicles();
     
     // Create a matrix view on all the delivery variables
-    Matrix<IntVarArray> mD_Order(D_Order, numD, numV);
-    Matrix<IntVarArray> mD_Station(D_Station, numD, numV);
-    Matrix<IntVarArray> mD_tLoad(D_tLoad, numD, numV);
-    Matrix<IntVarArray> mD_tUnload(D_tUnload, numD, numV);
-    
-    // Create an array of start times of orders
-    IntArgs O_tStart(input.getNumOrders(), input.getOrderStartTimes() );
+    Matrix<IntVarArray> mD_Order(D_Order, numV, numD);
+    Matrix<IntVarArray> mD_Station(D_Station, numV, numD);
+    Matrix<IntVarArray> mD_tLoad(D_tLoad, numV, numD);
+    Matrix<IntVarArray> mD_tUnload(D_tUnload, numV, numD
+    );
     
     // Set boolean flags for all active deliveries
-    BoolVarArgs D_Used(*this, numD * numV, 0, 1);
-    Matrix<BoolVarArgs> mD_Used(D_Used, numD, numV);
+    BoolVarArgs D_Used(*this, numV * numD, 0, 1);
+    Matrix<BoolVarArgs> mD_Used(D_Used, numV, numD);
     
     for (int i = 0; i < numV; i++) {
       for (int d = 0; d < numD; d++) {
-        rel(*this, mD_Used(d, i) == (d < Deliveries[i]));
+        rel(*this, mD_Used(i, d) == (d < Deliveries[i]));
       }
     }
     
     // Force all unused deliveries to some value
     for (int i = 0; i < numV; i++) {
       for (int d = 0; d < numD; d++) {
-        rel(*this, mD_Used(d, i) || (mD_Order(d, i) == 0));
-        rel(*this, mD_Used(d, i) || (mD_Station(d, i) == 0));
-        rel(*this, mD_Used(d, i) || (mD_tLoad(d, i) == 0));
-        rel(*this, mD_Used(d, i) || (mD_tUnload(d, i) == 0));
+        rel(*this, mD_Used(i, d) || (mD_Order(i, d) == 0));
+        rel(*this, mD_Used(i, d) || (mD_Station(i, d) == 0));
+        rel(*this, mD_Used(i, d) || (mD_tLoad(i, d) == 0));
+        rel(*this, mD_Used(i, d) || (mD_tUnload(i, d) == 0));
       }
     }
     
     /// ----- helper variables per delivery -----
+
+    // Start times of orders
+    IntArgs O_tStart(input.getNumOrders(), input.getOrderStartTimes() );
+    
+    // Required discharge rates of orders
+    IntArgs O_reqDischargeRates(input.getNumOrders(), input.getOrderReqDischargeRates());
+    
+    // Required volumes of orders
+    IntArgs O_reqPipeLengths(input.getNumOrders(), input.getOrderReqPipeLengths());
+    
+    // Total volume to pour per order
+    IntArgs O_totalVolumes(input.getNumOrders(), input.getOrderTotalVolumes());
+    
+    // Volume of vehicles per order
+    IntArgs V_volumes(input.getNumOrders() * input.getNumVehicles(), input.getOrderVehicleVolumes());
+    Matrix<IntArgs> mV_volumes(V_volumes, input.getNumOrders(), input.getNumVehicles());
+    
+    // Travel time from stations to yards
+    IntArgs O_dt_travelTo(input.getNumOrders() * input.getNumStations(), input.getTravelTimesToYards());
+    Matrix<IntArgs> mO_dt_travelTo(O_dt_travelTo, input.getNumOrders(), input.getNumStations());
+    
+    // Travel time from yards to stations
+    IntArgs O_dt_travelFrom(input.getNumOrders() * input.getNumStations(), input.getTravelTimesFromYards());
+    Matrix<IntArgs> mO_dt_travelFrom(O_dt_travelFrom, input.getNumOrders(), input.getNumStations());    
+    
+    // Station load times
+    IntArgs S_tLoad(input.getNumStations(), input.getStationLoadTimes());
+    
+    
     
     // Timestamp of arrival at yard
-    IntVarArgs D_t_arrival(*this, numD * numV, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_t_arrival(D_t_arrival, numD, numV);
+    IntVarArgs D_t_arrival(*this, numV * numD, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_t_arrival(D_t_arrival, numV, numD);
 
     // Time to travel to yard
-    IntVarArgs D_t_travelTo(*this, numD * numV, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_t_travelTo(D_t_travelTo, numD, numV);
+    IntVarArgs D_t_travelTo(*this, numV * numD, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_t_travelTo(D_t_travelTo, numV, numD);
     
     // Time required for unloading
-    IntVarArgs D_dT_Unloading(*this, numD * numV, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_dT_Unloading(D_dT_Unloading, numD, numV);
+    IntVarArgs D_dT_Unloading(*this, numV * numD, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_dT_Unloading(D_dT_Unloading, numV, numD);
     
     
     
@@ -104,22 +131,30 @@ public:
     
     // First delivery of vehicle i must not start before V_i.available
     for (int i = 0; i < numV; i++) {
-      rel(*this, (mD_tLoad(0, i) >= input.getVehicle(i).availableFrom()) || !mD_Used(0, i));
+      rel(*this, (mD_tLoad(i, 0) >= input.getVehicle(i).availableFrom()) || !mD_Used(i, 0));
     }
     
     // Unloading must not start before the order starts
-    for (int d = 0; d < numV * numD; d++) {
+    for (int d = 0; d < numD * numV; d++) {
       rel(*this, D_tUnload[d] >= element(O_tStart, D_Order[d]) || !D_Used[d]);
     }
     
     // Vehicles start at station 0
     for (int i = 0; i < numV; i++) {
-      rel(*this, mD_Station(0, i) == 0);
+      rel(*this, mD_Station(i, 0) == 0);
     }
+    
+    // Vehicle must have required pipeline length and discharge rate for orders
+    
+    
+    // Loading can only start after vehicle arrived back at the station
+    
     
     
     
     /// ------ define cost function ----
+    
+    
     
     // Temporary for now
     rel(*this, Cost == 0);

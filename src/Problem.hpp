@@ -204,15 +204,18 @@ public:
   const int* getOrderStartTimes() { return _orderStartTimes; }  
 
   const int* getOrderTotalVolumes() { return _orderTotalVolumes; }
-  
+
+  // [order, vehicle]
   const int* getOrderVehicleVolumes() { return _orderVehicleVolumes; }
   
   const int* getOrderReqDischargeRates() { return _orderReqDischargeRates; }
   
   const int* getOrderReqPipeLengths() { return _orderReqPipeLength; }
   
+  // [order, station]
   const int* getTravelTimesToYards() { return _travelTimesTo; }
   
+  // [order, station]
   const int* getTravelTimesFromYards() { return _travelTimesFrom; }
   
   const int* getStationLoadTimes() { return _stationLoadTimes; }
