@@ -52,6 +52,7 @@ public:
   {
     int numD = input.getMaxDeliveries();
     int numV = input.getNumVehicles();
+    int numO = input.getNumOrders();
     
     // Create a matrix view on all the delivery variables
     Matrix<IntVarArray> mD_Order(D_Order, numV, numD);
@@ -114,17 +115,22 @@ public:
     // Timestamp of arrival at yard
     IntVarArgs D_t_arrival(*this, numV * numD, 0, Int::Limits::max);
     Matrix<IntVarArgs> mD_t_arrival(D_t_arrival, numV, numD);
-
-    // Time to travel to yard
-    IntVarArgs D_t_travelTo(*this, numV * numD, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_t_travelTo(D_t_travelTo, numV, numD);
+    
+    for (int i = 0; i < numV * numD; i++) {
+      rel(*this, D_t_arrival[i] == D_tLoad[i] + element(S_tLoad, D_Station[i]) +
+                                   element(O_dt_travelTo, D_Order[i] * numO + D_Station[i]));
+    }
     
     // Time required for unloading
     IntVarArgs D_dT_Unloading(*this, numV * numD, 0, Int::Limits::max);
     Matrix<IntVarArgs> mD_dT_Unloading(D_dT_Unloading, numV, numD);
     
-    
-    
+    for (int i = 0; i < numV; i++) {
+      for (int d = 0; d < numD; d++) {
+        rel(*this, mD_dT_Unloading(i, d) == element(V_volumes, mD_Order(i, d) * numO + i) /
+                                            element(O_reqDischargeRates, mD_Order(i, d)));
+      }
+    }
     
     
     /// ---- add constraints ----
@@ -146,8 +152,9 @@ public:
     
     // Vehicle must have required pipeline length and discharge rate for orders
     
-    
     // Loading can only start after vehicle arrived back at the station
+    
+    // Unloading can only start after the vehicle arrived at the yard
     
     
     
@@ -218,7 +225,7 @@ int main(int argc, char** argv) {
   
   RMC *rmc = new RMC(input);
   
-  Gist::bab(rmc);
+  //Gist::bab(rmc);
   BAB<RMC> bab(rmc);
   
   delete rmc;
