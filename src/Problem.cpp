@@ -109,8 +109,8 @@ void RMCInput::loadProblem(char* filename) {
     
     if (currentVehicle._normalVolume == 0 && currentVehicle._maximumVolume == 0) continue;
     
-    Vehicle *v = new Vehicle(currentVehicle._vehicleCode, currentVehicle._pumpLength, currentVehicle._dischargeRate/60.0,
-                             currentVehicle._normalVolume, currentVehicle._maximumVolume, timeStamp);
+    Vehicle *v = new Vehicle(currentVehicle._vehicleCode, currentVehicle._pumpLength, currentVehicle._dischargeRate * (1000.0/60.0),
+                             currentVehicle._normalVolume * 1000, currentVehicle._maximumVolume * 1000, timeStamp);
     _vehicles.push_back(v);
   }
   
@@ -120,7 +120,7 @@ void RMCInput::loadProblem(char* filename) {
     
     int minTimeStamp = (int)difftime(currentOrder._unixTimeStamp, _baseTimeStamp);
     
-    Order *o = new Order(currentOrder._orderCode, currentOrder._volume,(currentOrder._dischargeRate/60.0), 
+    Order *o = new Order(currentOrder._orderCode, currentOrder._volume * 1000,(currentOrder._dischargeRate * (1000.0/60.0)), 
                          currentOrder._pumpLength, getStation(currentOrder._preferredStationCode), 
                          currentOrder._maxVolumeAllowed, minTimeStamp, 
                          currentOrder._constructionYard._waitingMinutes, stationList.size());
@@ -133,7 +133,7 @@ void RMCInput::loadProblem(char* filename) {
   // TODO make this more tight! (i.e., use a greedy alg. to assign yards to trucks
   
   // find the smallest vehicle capacity
-  float minCapacity = _vehicles[0]->volume(false);
+  int minCapacity = _vehicles[0]->volume(false);
   for (int i = 1; i < _vehicles.size(); i++) {
     minCapacity = std::min(minCapacity, _vehicles[i]->volume(false));
   }
@@ -142,11 +142,11 @@ void RMCInput::loadProblem(char* filename) {
   for (int i = 0; i < _orders.size(); i++) {
     Order &order = *_orders[i];
     
-    float volume = order.totalVolume();
-    int deliveries = ceil( volume / minCapacity );
+    int volume = order.totalVolume();
+    int deliveries = volume / minCapacity;
     
     int timeDelivery = maxLoadTime + 2 * _maxTravelTime + order.dTimeSetup() 
-                     + ceil(minCapacity / order.dischargeRate());
+                     + minCapacity / order.dischargeRate();
     
     _maxDeliveries += deliveries;
     
@@ -160,12 +160,45 @@ void RMCInput::loadProblem(char* filename) {
 void RMCInput::buildValueArrays()
 {
   _orderStartTimes = new int[_orders.size()];
+  _orderReqDischargeRates = new int[_orders.size()];
+  _orderReqPipeLength = new int[_orders.size()];
+  _orderTotalVolumes = new int[_orders.size()];
   
   for (int i = 0; i < _orders.size(); i++) {
     Order *o = _orders[i];
     _orderStartTimes[i] = o->timeStart();
+    _orderReqDischargeRates[i] = o->dischargeRate();
+    _orderReqPipeLength[i] = o->requiredPumpLength();
+    _orderTotalVolumes[i] = o->totalVolume();
   }
   
+  _stationLoadTimes = new int[_stations.size()];
+  
+  for (int i = 0; i < _stations.size(); i++) {
+    Station *s = _stations[i];
+    _stationLoadTimes[i] = s->loadingMinutes(); 
+  }
+  
+  _orderVehicleVolumes = new int[_orders.size() * _vehicles.size()];
+  
+  for (int j = 0; j < _orders.size(); j++) {
+    Order *o = _orders[j];
+    for (int i = 0; i < _vehicles.size(); i++) {
+      Vehicle *v = _vehicles[i];
+      _orderVehicleVolumes[ i * _orders.size() + j ] = v->volume(o->maxVolumeAllowed());
+    }
+  }
+  
+  _travelTimesTo   = new int[_orders.size() * _stations.size()];
+  _travelTimesFrom = new int[_orders.size() * _stations.size()];
+  
+  for (int i = 0; i < _orders.size(); i++) {
+    Order *o = _orders[i];
+    for (int j = 0; j < _stations.size(); j++) {
+      _travelTimesTo  [ i * _orders.size() + j ] = o->toStation(j);
+      _travelTimesFrom[ i * _orders.size() + j ] = o->fromStation(j);
+    }
+  }
   
 }
 

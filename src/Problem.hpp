@@ -19,7 +19,8 @@ static const int MAX_TRAVEL_TIME = 5000000;
 
 class Order {
 public:
-  Order(char *name, float vol, float dischargeRate, int pumpLength, int preferredStation,
+  /// volumes in dm3, rates in dm3/min
+  Order(char *name, int vol, int dischargeRate, int pumpLength, int preferredStation,
         bool maxVolumeAllowed, int startTime, int setupTime, int numStations)
   : _name(name),
     _totalVolume(vol), _dischargeRate(dischargeRate), 
@@ -38,7 +39,8 @@ public:
   
   int requiredPumpLength() {return _requiredPumpLength;}
 
-  float totalVolume() {return _totalVolume;}
+  // dm3
+  int totalVolume() {return _totalVolume;}
 
   int preferredStation() {return _preferredStation;}
 
@@ -46,7 +48,8 @@ public:
 
   int dTimeSetup() {return _setupTime;}
 
-  float dischargeRate() {return _dischargeRate;}
+  // dm3 / min
+  int dischargeRate() {return _dischargeRate;}
   
   bool maxVolumeAllowed() { return _maxVolumeAllowed; }
   
@@ -70,8 +73,8 @@ public:
 private:
   std::string _name;
   
-  float _totalVolume;
-  float _dischargeRate;
+  int _totalVolume;
+  int _dischargeRate;
   int _requiredPumpLength;
   int _preferredStation;
   int _startTime;
@@ -85,7 +88,8 @@ private:
 
 class Vehicle {
 public:
-  Vehicle(char *name, int pumpLength, float maxDischargeRate, int normalVolume, 
+  /// volumes in dm3, rates in dm3/min
+  Vehicle(char *name, int pumpLength, int maxDischargeRate, int normalVolume, 
           int maxVolume, int availFrom)
   : _name(name),
     _pumpLenght(pumpLength), _maxDischargeRate(maxDischargeRate), 
@@ -100,11 +104,13 @@ public:
     return _pumpLenght;
   }
   
-  float maxDischargeRate() {
+  /// dm3 / min
+  int maxDischargeRate() {
     return _maxDischargeRate;
   }
   
-  float volume(bool maxVolume) {
+  // dm3
+  int volume(bool maxVolume) {
     if (_maxVolume == _normalVolume) {
       return _maxVolume;
     }
@@ -122,7 +128,7 @@ private:
   std::string _name;
   
   int _pumpLenght;
-  float _maxDischargeRate;
+  int _maxDischargeRate;
   int _normalVolume;
   int _maxVolume;
   int _availableFrom;
@@ -197,6 +203,20 @@ public:
 
   const int* getOrderStartTimes() { return _orderStartTimes; }  
 
+  const int* getOrderTotalVolumes() { return _orderTotalVolumes; }
+  
+  const int* getOrderVehicleVolumes() { return _orderVehicleVolumes; }
+  
+  const int* getOrderReqDischargeRates() { return _orderReqDischargeRates; }
+  
+  const int* getOrderReqPipeLengths() { return _orderReqPipeLength; }
+  
+  const int* getTravelTimesToYards() { return _travelTimesTo; }
+  
+  const int* getTravelTimesFromYards() { return _travelTimesFrom; }
+  
+  const int* getStationLoadTimes() { return _stationLoadTimes; }
+  
   
 private:
   void setTimesForOrder(Order *order, XMLOrder &xmlorder);
@@ -216,7 +236,19 @@ private:
   time_t _baseTimeStamp;
   
   // Arrays 
-  int* _orderStartTimes;
+  int*   _orderStartTimes;
+  int*   _orderTotalVolumes;
+  int*   _orderReqDischargeRates;
+  int*   _orderReqPipeLength;
+  
+  int*   _stationLoadTimes;
+  
+  // orders * vehicles  
+  int*   _orderVehicleVolumes;
+  
+  // orders * stations
+  int*   _travelTimesTo;
+  int*   _travelTimesFrom;
 };
 
 class RMCOutput {

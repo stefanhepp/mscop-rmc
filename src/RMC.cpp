@@ -71,8 +71,6 @@ public:
         rel(*this, mD_Used(d, i) == (d < Deliveries[i]));
       }
     }
-
-    /// ---- add constraints ----
     
     // Force all unused deliveries to some value
     for (int i = 0; i < numV; i++) {
@@ -84,6 +82,26 @@ public:
       }
     }
     
+    /// ----- helper variables per delivery -----
+    
+    // Timestamp of arrival at yard
+    IntVarArgs D_t_arrival(*this, numD * numV, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_t_arrival(D_t_arrival, numD, numV);
+
+    // Time to travel to yard
+    IntVarArgs D_t_travelTo(*this, numD * numV, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_t_travelTo(D_t_travelTo, numD, numV);
+    
+    // Time required for unloading
+    IntVarArgs D_dT_Unloading(*this, numD * numV, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_dT_Unloading(D_dT_Unloading, numD, numV);
+    
+    
+    
+    
+    
+    /// ---- add constraints ----
+    
     // First delivery of vehicle i must not start before V_i.available
     for (int i = 0; i < numV; i++) {
       rel(*this, (mD_tLoad(0, i) >= input.getVehicle(i).availableFrom()) || !mD_Used(0, i));
@@ -92,6 +110,11 @@ public:
     // Unloading must not start before the order starts
     for (int d = 0; d < numV * numD; d++) {
       rel(*this, D_tUnload[d] >= element(O_tStart, D_Order[d]) || !D_Used[d]);
+    }
+    
+    // Vehicles start at station 0
+    for (int i = 0; i < numV; i++) {
+      rel(*this, mD_Station(0, i) == 0);
     }
     
     
