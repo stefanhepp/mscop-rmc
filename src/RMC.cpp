@@ -62,32 +62,35 @@ public:
     int numD = input.getMaxDeliveries();
     int numV = input.getNumVehicles();
     int numO = input.getNumOrders();
+    int numS = input.getNumStations();
     int numVD = numO * numD;
     int numOD = numV * numD;
     
+    // Note: Gecode uses COLUMN first, then ROW as arguments to Matrix.
+    
     // Create a matrix view on all the delivery variables
-    Matrix<IntVarArray> mD_Order(D_Order, numV, numVD);
-    Matrix<IntVarArray> mD_Station(D_Station, numV, numVD);
-    Matrix<IntVarArray> mD_tLoad(D_tLoad, numV, numVD);
-    Matrix<IntVarArray> mD_tUnload(D_tUnload, numV, numVD);
+    Matrix<IntVarArray> mD_Order(D_Order, numVD, numV);
+    Matrix<IntVarArray> mD_Station(D_Station, numVD, numV);
+    Matrix<IntVarArray> mD_tLoad(D_tLoad, numVD, numV);
+    Matrix<IntVarArray> mD_tUnload(D_tUnload, numVD, numV);
     
     // Set boolean flags for all active deliveries
     BoolVarArgs D_Used(*this, numV * numVD, 0, 1);
-    Matrix<BoolVarArgs> mD_Used(D_Used, numV, numVD);
+    Matrix<BoolVarArgs> mD_Used(D_Used, numVD, numV);
     
     for (int i = 0; i < numV; i++) {
       for (int d = 0; d < numVD; d++) {
-        rel(*this, mD_Used(i, d) == (d < Deliveries[i]));
+        rel(*this, mD_Used(d, i) == (d < Deliveries[i]));
       }
     }
     
     // Force all unused deliveries to some value
     for (int i = 0; i < numV; i++) {
       for (int d = 0; d < numVD; d++) {
-        rel(*this, mD_Used(i, d) || (mD_Order(i, d) == 0));
-        rel(*this, mD_Used(i, d) || (mD_Station(i, d) == 0));
-        rel(*this, mD_Used(i, d) || (mD_tLoad(i, d) == 0));
-        rel(*this, mD_Used(i, d) || (mD_tUnload(i, d) == 0));
+        rel(*this, mD_Used(d, i) || (mD_Order(d, i) == 0));
+        rel(*this, mD_Used(d, i) || (mD_Station(d, i) == 0));
+        rel(*this, mD_Used(d, i) || (mD_tLoad(d, i) == 0));
+        rel(*this, mD_Used(d, i) || (mD_tUnload(d, i) == 0));
       }
     }
     
@@ -125,10 +128,10 @@ public:
     
     // Time to travel to yard
     IntVarArgs D_dT_travelTo(*this, numV * numVD, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_dT_travelTo(D_dT_travelTo, numV, numVD);
+    Matrix<IntVarArgs> mD_dT_travelTo(D_dT_travelTo, numVD, numV);
     
     for (int i = 0; i < numV * numVD; i++) {
-      rel(*this, (D_dT_travelTo[i] == element(O_dt_travelTo, D_Order[i] * numVD + D_Station[i]) && D_Used[i]) ||
+      rel(*this, (D_dT_travelTo[i] == element(O_dt_travelTo, D_Order[i] * numS + D_Station[i]) && D_Used[i]) ||
                  (D_dT_travelTo[i] == 0 && !D_Used[i]));
     }
     
@@ -136,19 +139,19 @@ public:
     // We ignore the trip back from the last delivery.. since the time to travel back
     // only depends on the station to travel to, we can just assume we travel back to a fixed station and eliminate this value    
     IntVarArgs D_dT_travelFrom(*this, numV * numVD, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_dT_travelFrom(D_dT_travelFrom, numV, numVD);
+    Matrix<IntVarArgs> mD_dT_travelFrom(D_dT_travelFrom, numVD, numV);
     
     for (int i = 0; i < numV; i++) {
       for (int d = 1; d < numVD; d++) {
-        rel(*this, (mD_dT_travelFrom(i, d-1) == element(O_dt_travelFrom, mD_Order(i, d-1) * numO + mD_Station(i,d)) && mD_Used(i,d)) ||
-                   (mD_dT_travelFrom(i, d-1) == 0 && !mD_Used(i,d)));
+        rel(*this, (mD_dT_travelFrom(d-1, i) == element(O_dt_travelFrom, mD_Order(d-1, i) * numS + mD_Station(d, i)) && mD_Used(d, i)) ||
+                   (mD_dT_travelFrom(d-1, i) == 0 && !mD_Used(d, i)));
       }
-      rel(*this, mD_dT_travelFrom(i, numVD-1) == 0);
+      rel(*this, mD_dT_travelFrom(numVD-1, i) == 0);
     }
 
     // Timestamp of arrival at yard
     IntVarArgs D_t_arrival(*this, numV * numVD, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_t_arrival(D_t_arrival, numV, numVD);
+    Matrix<IntVarArgs> mD_t_arrival(D_t_arrival, numVD, numV);
     
     for (int i = 0; i < numV * numVD; i++) {
       rel(*this, D_t_arrival[i] == D_tLoad[i] + element(S_tLoad, D_Station[i]) + D_dT_travelTo[i]);
@@ -156,12 +159,12 @@ public:
 
     // Amount of concrete delivered by a delivery 
     IntVarArgs D_delivered(*this, numV * numVD, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_delivered(D_delivered, numV, numVD);
+    Matrix<IntVarArgs> mD_delivered(D_delivered, numVD, numV);
     
     for (int i = 0; i < numV; i++) {
       for (int d = 0; d < numVD; d++) {
-        rel(*this, (mD_delivered(i,d) == element(V_volumes, mD_Order(i, d) * numO + i) && mD_Used(i,d)) ||
-                   (mD_delivered(i,d) == 0 && !mD_Used(i,d)));
+        rel(*this, (mD_delivered(d, i) == element(V_volumes, mD_Order(d, i) * numV + i) && mD_Used(d, i)) ||
+                   (mD_delivered(d, i) == 0 && !mD_Used(d, i)));
       }
     }
     
@@ -169,23 +172,23 @@ public:
     // TODO in case D_tUnload + D_dT_Unloading - D_tLoad > Tmax, we might unload faster, but we do not want this anyway.
     
     IntVarArgs D_dT_Unloading(*this, numV * numVD, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_dT_Unloading(D_dT_Unloading, numV, numVD);
+    Matrix<IntVarArgs> mD_dT_Unloading(D_dT_Unloading, numVD, numV);
     
     for (int i = 0; i < numV; i++) {
       for (int d = 0; d < numVD; d++) {
-        rel(*this, mD_dT_Unloading(i, d) == mD_delivered(i,d) / element(O_reqDischargeRates, mD_Order(i, d)));
+        rel(*this, mD_dT_Unloading(d, i) == mD_delivered(d, i) / element(O_reqDischargeRates, mD_Order(d, i)));
       }
     }
     
     // Amount of concrete poured by a delivery (excluding bad concrete)
     IntVarArgs D_poured(*this, numV * numVD, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mD_poured(D_poured, numV, numVD);
+    Matrix<IntVarArgs> mD_poured(D_poured, numVD, numV);
     
     for (int i = 0; i < numV; i++) {
       for (int d = 0; d < numVD; d++) {
-        rel(*this, mD_poured(i,d) == min( mD_delivered(i,d), 
-                                          (input.getTimeMax() - mD_tUnload(i,d) + mD_tLoad(i,d)) * 
-                                              element(O_reqDischargeRates, mD_Order(i,d)) 
+        rel(*this, mD_poured(d, i) == min( mD_delivered(d, i), 
+                                          (input.getTimeMax() - mD_tUnload(d, i) + mD_tLoad(d, i)) * 
+                                              element(O_reqDischargeRates, mD_Order(d, i)) 
                                         ) );
       }
     }
@@ -199,10 +202,10 @@ public:
       
       for (int d= 0; d < numV * numVD; d++) {
         // Only in Gecode 4.2
-        // ite(*this, D_Used[d], D_poured[d], 0, volume[d]);
+        // ite(*this, D_Order[d] == i, D_poured[d], 0, volume[d]);
         
-        rel(*this, (volume[d] == D_poured[d] && D_Used[d]) ||
-                   (volume[d] == 0 && !D_Used[d]));
+        rel(*this, (volume[d] == D_poured[d] && D_Order[d] == i) ||
+                   (volume[d] == 0 && D_Order[d] != i));
       }
       
       rel(*this, O_poured[i] == sum(volume));
@@ -223,7 +226,7 @@ public:
     
     // Loading of vehicle i must not start before V_i.available
     for (int i = 0; i < numV; i++) {
-      rel(*this, (mD_tLoad(i, 0) >= input.getVehicle(i).availableFrom()) || !mD_Used(i, 0));
+      rel(*this, (mD_tLoad(0, i) >= input.getVehicle(i).availableFrom()) || !mD_Used(0, i));
     }
     
     // Unloading must not start before the order starts
@@ -233,29 +236,29 @@ public:
     
     // Vehicles start at station 0
     for (int i = 0; i < numV; i++) {
-      rel(*this, mD_Station(i, 0) == 0);
+      rel(*this, mD_Station(0, i) == 0);
     }
     
     // Vehicle must have required pipeline length and discharge rate for orders
     for (int i = 0; i < numV; i++) {
       Vehicle &v = input.getVehicle(i);
       for (int d = 0; d < numVD; d++) {
-        rel(*this, element(O_reqPipeLengths, mD_Order(i,d)) <= v.pumpLength() || !mD_Used(i,d));
-        rel(*this, element(O_reqDischargeRates, mD_Order(i,d)) <= v.maxDischargeRate() || !mD_Used(i,d));
+        rel(*this, element(O_reqPipeLengths, mD_Order(d, i)) <= v.pumpLength() || !mD_Used(d, i));
+        rel(*this, element(O_reqDischargeRates, mD_Order(d, i)) <= v.maxDischargeRate() || !mD_Used(d, i));
       }
     }
     
     // Loading can only start after vehicle arrived back at the station
     for (int i = 0; i < numV; i++) {
       for (int d = 1; d < numVD; d++) {
-        rel(*this, mD_tUnload(i,d-1) + mD_dT_Unloading(i,d-1) + mD_dT_travelFrom(i,d-1) <= mD_tLoad(i,d) || !mD_Used(i,d));
+        rel(*this, mD_tUnload(d-1, i) + mD_dT_Unloading(d-1, i) + mD_dT_travelFrom(d-1, i) <= mD_tLoad(d, i) || !mD_Used(d, i));
       }
     }
     
     // Unloading can only start after the vehicle arrived at the yard
     for (int i = 0; i < numV; i++) {
       for (int d = 0; d < numVD; d++) {
-        rel(*this, mD_t_arrival(i,d) <= mD_tUnload(i,d) - element(O_dT_setup, D_Order[i]) || !mD_Used(i,d));
+        rel(*this, mD_t_arrival(d, i) <= mD_tUnload(d, i) - element(O_dT_setup, D_Order[i]) || !mD_Used(d, i));
       }
     }
     
@@ -320,22 +323,22 @@ public:
     // Calculate lateness of first delivery and time lag of other deliveries
     IntVarArgs O_Lateness(*this, numO, 0, Int::Limits::max);
     IntVarArgs O_tLag(*this, numO * numOD, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mO_tLag(O_tLag, numO, numOD); 
+    Matrix<IntVarArgs> mO_tLag(O_tLag, numOD, numO); 
     
     // First create an array containing unloading start times per order
     IntVarArgs O_tUnload(*this, numO * numOD, 0, Int::Limits::max);
-    Matrix<IntVarArgs> mO_tUnload(O_tUnload, numO, numOD);
+    Matrix<IntVarArgs> mO_tUnload(O_tUnload, numOD, numO);
     
     // Enforce sorting of O_tUnload
     for (int o = 0; o < numO; o++) {
       for (int d = 1; d < numOD; d++) {
-        rel(*this, (mO_tUnload(o, d-1) < mO_tUnload(o,d) || (d >= O_Deliveries[o])));
+        rel(*this, (mO_tUnload(d-1, o) < mO_tUnload(d, o) || (d >= O_Deliveries[o])));
       }
     }
     
     // Create a permutation of D_tUnload onto O_tUnload
     IntVarArgs ODMap(*this, numO * numOD, 0, numV * numVD - 1);
-    Matrix<IntVarArgs> mODMap(ODMap, numO, numOD);
+    Matrix<IntVarArgs> mODMap(ODMap, numOD, numO);
         
     // - All values must be distinct
     distinct(*this, ODMap);
@@ -343,7 +346,7 @@ public:
     // - Map to deliveries from same order
     for (int i = 0; i < numO; i++) {
       for (int d = 0; d < numOD; d++) {
-        rel(*this, element(D_Order, mODMap(i,d)) == i || d > O_Deliveries[i]);
+        rel(*this, element(D_Order, mODMap(d, i)) == i || d > O_Deliveries[i]);
       }
     }
     
@@ -351,12 +354,12 @@ public:
     for (int i = 0; i < numO; i++) {
       for (int d = 1; d < numOD; d++) {
         // ODMap[o, d-1] < ODMap[o, d] if !Used[d-1]
-        rel(*this, mODMap(i, d-1) < mODMap(i, d) || d-1 < O_Deliveries[i]);
+        rel(*this, mODMap(d-1, i) < mODMap(d, i) || d-1 < O_Deliveries[i]);
       }      
     }
     for (int i = 1; i < numO; i++) {
       // ODMap[o-1, max] < ODMap[o, min(unused)]
-      rel(*this, mODMap(i-1, numOD-1) < element(ODMap, i * numOD + O_Deliveries[i]) || 
+      rel(*this, mODMap(numOD-1, i-1) < element(ODMap, i * numOD + O_Deliveries[i]) || 
                  O_Deliveries[i-1] == numOD-1 || O_Deliveries[i] == numOD-1);
     }
     
@@ -364,11 +367,11 @@ public:
     // Define Lateness per order and TimeLags per order over order unloading times
     for (int i = 0; i < numO; i++) {
       Order &o = input.getOrder(i);
-      rel(*this, O_Lateness[i] == mO_tUnload(i, 0) - o.timeStart());
+      rel(*this, O_Lateness[i] == mO_tUnload(0, i) - o.timeStart());
       
       for (int d = 1; d < numOD; d++) {
-        rel(*this, ((mO_tLag(i,d) == mO_tUnload(i, d) - mO_tUnload(i, d-1) - element(D_dT_Unloading, mODMap(i, d))) && (d < O_Deliveries[i])) ||
-                   ((mO_tLag(i,d) == 0) && (d >= O_Deliveries[i])) );
+        rel(*this, ((mO_tLag(d, i) == mO_tUnload(d, i) - mO_tUnload(d-1, i) - element(D_dT_Unloading, mODMap(d, i))) && (d < O_Deliveries[i])) ||
+                   ((mO_tLag(d, i) == 0) && (d >= O_Deliveries[i])) );
       }
     }
     

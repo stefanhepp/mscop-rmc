@@ -191,7 +191,7 @@ void RMCInput::buildValueArrays()
     Order *o = _orders[j];
     for (int i = 0; i < _vehicles.size(); i++) {
       Vehicle *v = _vehicles[i];
-      _orderVehicleVolumes[ i * _orders.size() + j ] = v->volume(o->maxVolumeAllowed());
+      _orderVehicleVolumes[ i * _vehicles.size() + j ] = v->volume(o->maxVolumeAllowed());
     }
   }
   
