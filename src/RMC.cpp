@@ -66,6 +66,7 @@ protected:
   // Lateness of orders
   IntVarArray O_Lateness;
   
+  IntVarArray ODMap;
 public:
   /// problem construction
 
@@ -79,7 +80,9 @@ public:
     O_Poured(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
     O_Deliveries(*this, opt.getInput().getNumOrders(), 0, opt.getInput().getMaxDeliveries()),
     O_Waste(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
-    O_Lateness(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max)
+    O_Lateness(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
+    
+    ODMap(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTotalDeliveries() - 1)
   {
     const RMCInput &input = opt.getInput();
     
@@ -235,7 +238,7 @@ public:
       rel(*this, O_Poured[i] == sum(volume));
     }
 
-    
+
     // Deliveries per order
     for (int i = 1; i < numO; i++) {
       count(*this, D_Order, i, IRT_EQ, O_Deliveries[i]);
@@ -352,12 +355,12 @@ public:
     // Enforce sorting of O_tUnload
     for (int o = 0; o < numO; o++) {
       for (int d = 1; d < numOD; d++) {
-        rel(*this, (mO_tUnload(d-1, o) < mO_tUnload(d, o) || (d >= O_Deliveries[o])));
+        rel(*this, (mO_tUnload(d-1, o) < mO_tUnload(d, o)) || (d >= O_Deliveries[o]));
       }
     }
     
     // Create a permutation of D_tUnload onto O_tUnload
-    IntVarArgs ODMap(*this, numO * numOD, 0, numV * numVD - 1);
+    //IntVarArgs ODMap(*this, numO * numOD, 0, numV * numVD - 1);
     Matrix<IntVarArgs> mODMap(ODMap, numOD, numO);
         
     // - All values must be distinct
@@ -398,7 +401,7 @@ public:
     rel(*this, Cost == sum(O_Lateness) * input.getAlpha1() + sum(O_Waste) * input.getAlpha2() +
                        sum(Preferred) * input.getAlpha3() + sum(O_tLag) * input.getAlpha4() +
                        (sum(D_dT_travelTo) + sum(D_dT_travelFrom)) * input.getAlpha5());
- 
+
     /// ----------- branching -----------
     
     branch(*this, Deliveries, INT_VAR_REGRET_MIN_MIN, INT_VAL_MAX);
@@ -425,6 +428,8 @@ public:
     O_Deliveries.update(*this, share, rmc.O_Deliveries);
     O_Waste.update(*this, share, rmc.O_Waste);
     O_Lateness.update(*this, share, rmc.O_Lateness);
+    
+    ODMap.update(*this, share, rmc.ODMap);
   }
 
   virtual Space* copy(bool share) {
@@ -449,6 +454,9 @@ public:
     out << D_tLoad << std::endl;
     out << "Unload Times:\n";
     out << D_tUnload << std::endl;
+    
+    out << "ODMap:\n";
+    out << ODMap << std::endl;
     out << std::endl;
     
     out << "Number of deliveries per order:\n";
