@@ -66,6 +66,7 @@ protected:
   // Lateness of orders
   IntVarArray O_Lateness;
   
+  IntVarArray O_tUnload;
   IntVarArray ODMap;
 public:
   /// problem construction
@@ -82,6 +83,7 @@ public:
     O_Waste(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
     O_Lateness(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
     
+    O_tUnload(*this, opt.getInput().getMaxTotalDeliveries(), 0, Int::Limits::max),
     ODMap(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTotalDeliveries() - 1)
   {
     const RMCInput &input = opt.getInput();
@@ -349,7 +351,7 @@ public:
     Matrix<IntVarArgs> mO_tLag(O_tLag, numOD, numO); 
     
     // First create an array containing unloading start times per order
-    IntVarArgs O_tUnload(*this, numO * numOD, 0, Int::Limits::max);
+    //IntVarArgs O_tUnload(*this, numO * numOD, 0, Int::Limits::max);
     Matrix<IntVarArgs> mO_tUnload(O_tUnload, numOD, numO);
     
     // Enforce sorting of O_tUnload
@@ -362,7 +364,7 @@ public:
     // Create a permutation of D_tUnload onto O_tUnload
     //IntVarArgs ODMap(*this, numO * numOD, 0, numV * numVD - 1);
     Matrix<IntVarArgs> mODMap(ODMap, numOD, numO);
-        
+    
     // - All values must be distinct
     distinct(*this, ODMap);
     
@@ -372,7 +374,10 @@ public:
         rel(*this, element(D_Order, mODMap(d, i)) == i || d > O_Deliveries[i]);
       }
     }
-    
+    // - Map unload times
+    for (int d = 0; d < numO * numOD; d++) {
+      rel(*this, element(D_tUnload, ODMap[d]) == O_tUnload[d]);
+    }
     // - Break symmetries for unused deliveries
     for (int i = 0; i < numO; i++) {
       for (int d = 1; d < numOD; d++) {
@@ -404,11 +409,11 @@ public:
 
     /// ----------- branching -----------
     
-    branch(*this, Deliveries, INT_VAR_REGRET_MIN_MIN, INT_VAL_MAX);
-    branch(*this, D_Order,    INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
-    branch(*this, D_Station,  INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
-    branch(*this, D_tLoad,    INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
-    branch(*this, D_tUnload,  INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
+    branch(*this, Deliveries, INT_VAR_NONE, INT_VAL_SPLIT_MIN);
+    branch(*this, D_Order,    INT_VAR_NONE, INT_VAL_MIN);
+    branch(*this, D_Station,  INT_VAR_NONE, INT_VAL_MIN);
+    branch(*this, D_tLoad,    INT_VAR_NONE, INT_VAL_MIN);
+    branch(*this, D_tUnload,  INT_VAR_NONE, INT_VAL_MIN);
   }
 
   virtual ~RMC() {}
@@ -430,6 +435,7 @@ public:
     O_Lateness.update(*this, share, rmc.O_Lateness);
     
     ODMap.update(*this, share, rmc.ODMap);
+    O_tUnload.update(*this, share, rmc.O_tUnload);
   }
 
   virtual Space* copy(bool share) {
@@ -457,6 +463,8 @@ public:
     
     out << "ODMap:\n";
     out << ODMap << std::endl;
+    out << "O_tUnload:\n";
+    out << O_tUnload << std::endl;
     out << std::endl;
     
     out << "Number of deliveries per order:\n";
