@@ -49,11 +49,11 @@ protected:
 public:
   /// problem construction
 
-  RMC(RMCInput &input)
+  RMC(RMCInput &input) 
   : Deliveries(*this, input.getNumVehicles(), 0, input.getNumOrders() * input.getMaxDeliveries() - 1),
     D_Order(*this, input.getMaxTotalDeliveries(), 0, input.getNumOrders() - 1),
     D_Station(*this, input.getMaxTotalDeliveries(), 0, input.getNumStations() - 1),
-    D_tLoad(*this, input.getMaxTotalDeliveries(), 0, input.getMaxTimeStamp()), 
+    D_tLoad(*this, input.getMaxTotalDeliveries(), 0, input.getMaxTimeStamp()),
     D_tUnload(*this, input.getMaxTotalDeliveries(), 0, input.getMaxTimeStamp()),
     Cost(*this, 0, Int::Limits::max),
     O_poured(*this, input.getNumOrders(), 0, Int::Limits::max),
@@ -380,7 +380,6 @@ public:
                        sum(Preferred) * input.getAlpha3() + sum(O_tLag) * input.getAlpha4() +
                        (sum(D_dT_travelTo) + sum(D_dT_travelFrom)) * input.getAlpha5());
     
-    
     /// ----------- branching -----------
     
     branch(*this, Deliveries, INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
@@ -442,6 +441,7 @@ public:
 };
 
 int main(int argc, char** argv) {
+  
   if (argc < 2) {
     std::cerr << "Missing input file.\n";
     return 1;
@@ -453,7 +453,7 @@ int main(int argc, char** argv) {
   
   RMC *rmc = new RMC(input);
 
-  Gist::bab(rmc);
+  //Gist::bab(rmc);
   BAB<RMC> bab(rmc);
   
   delete rmc;
@@ -465,6 +465,8 @@ int main(int argc, char** argv) {
     std::cout << "Max depth: " << bab.statistics().depth << "\n";
     std::cout << "Max memory: " << bab.statistics().memory << "\n";
   }
+  
+  
   
   return 0;
 }
