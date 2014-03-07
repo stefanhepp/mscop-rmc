@@ -472,7 +472,7 @@ int main(int argc, char** argv) {
   
   RMCOptions opt("RMC", input);
   //opt.instance(name[0]);
-  //opt.solutions(0);
+  opt.iterations(5000);
   opt.parse(argc,argv);
   opt.loadProblem();
   
