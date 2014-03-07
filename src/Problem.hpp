@@ -181,8 +181,12 @@ public:
   int getNumStations() const { return _stations.size(); }
   
   int getNumOrders() const { return _orders.size(); }
-  
+
+  // Per order
   int getMaxDeliveries() const { return _maxDeliveries; }
+  
+  // overall deliveries
+  int getMaxTotalDeliveries() const { return _orders.size() * _vehicles.size() * _maxDeliveries; }
   
   int getMaxTimeStamp() const { return _maxTimeStamp; }
   

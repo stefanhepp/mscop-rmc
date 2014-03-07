@@ -123,6 +123,25 @@ Helper Variables, Constaints
   O_waste[O] = 
 
 
+
+- No overlap at stations
+  for each station:
+    
+
+
+- O_t_unload[o,d]:
+
+  O_deliveries[o] = count(D_order[d], o)
+
+  O_t_unloaded[o] = 
+
+
+- O_lateness[O]:
+  O_Lateness[o] = O_t_unload[o, 0] - O_start[o]
+
+- D_lag[o, d]:
+  D_lag[o, d] = O_t_unload[o, d] - (O_t_unload[o, d-1] + D_dT_unloading[o, 
+  D_lag[o, 0] = 0
   
 
 Output

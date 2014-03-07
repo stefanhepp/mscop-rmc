@@ -140,7 +140,7 @@ void RMCInput::loadProblem(char* filename) {
     minCapacity = std::min(minCapacity, _vehicles[i]->volume(false));
   }
   
-  // count how many deliveries are needed at most for all orders
+  // count how many deliveries are needed at most per order
   for (int i = 0; i < _orders.size(); i++) {
     Order &order = *_orders[i];
     
@@ -150,7 +150,7 @@ void RMCInput::loadProblem(char* filename) {
     int timeDelivery = maxLoadTime + 2 * _maxTravelTime + order.dTimeSetup() 
                      + minCapacity / order.dischargeRate();
     
-    _maxDeliveries += deliveries;
+    _maxDeliveries = std::max(_maxDeliveries, deliveries);
     
     _maxTimeStamp = std::max(_maxTimeStamp, order.timeStart());
     _maxTimeStamp += deliveries * timeDelivery;
