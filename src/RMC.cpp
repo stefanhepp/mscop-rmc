@@ -357,7 +357,17 @@ public:
   /// printing 
   
   void print() {
-    std::cout << "Deliveries per vehicle:\n";
+    // TODO print out per vehicle, skip unused deliveries
+    std::cout << "Orders per delivery:\n";
+    std::cout << D_Order << std::endl;
+    std::cout << "Stations per delivery:\n";
+    std::cout << D_Station << std::endl;
+    std::cout << "Load Times:\n";
+    std::cout << D_tLoad << std::endl;
+    std::cout << "Unload Times:\n";
+    std::cout << D_tUnload << std::endl;
+    
+    std::cout << "Number of deliveries per vehicle:\n";
     std::cout << Deliveries << std::endl;
     std::cout << "Concrete poured per order:\n";
     std::cout << O_poured << std::endl;
