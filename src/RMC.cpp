@@ -316,29 +316,65 @@ public:
       rel(*this, Preferred[d] == (D_Station[d] == element(O_preferredStation, D_Order[d])));
     }
     
+    
     // Calculate lateness of first delivery and time lag of other deliveries
-    IntVarArgs Lateness(*this, numO, 0, Int::Limits::max);
-    IntVarArgs TimeLag(*this, numV * numVD, 0, Int::Limits::max);
-
+    IntVarArgs O_Lateness(*this, numO, 0, Int::Limits::max);
+    IntVarArgs O_tLag(*this, numO * numOD, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mO_tLag(O_tLag, numO, numOD); 
+    
     // First create an array containing unloading start times per order
     IntVarArgs O_tUnload(*this, numO * numOD, 0, Int::Limits::max);
     Matrix<IntVarArgs> mO_tUnload(O_tUnload, numO, numOD);
     
-    // Enforce sorting
-    for (int i = 0; i < numO; i++) {
+    // Enforce sorting of O_tUnload
+    for (int o = 0; o < numO; o++) {
       for (int d = 1; d < numOD; d++) {
-//        rel(*this, (mO_tUnload(i, d-1) < mO_tUnload(i,d) || (d >= O_Deliveries[
+        rel(*this, (mO_tUnload(o, d-1) < mO_tUnload(o,d) || (d >= O_Deliveries[o])));
       }
     }
     
+    // Create a permutation of D_tUnload onto O_tUnload
+    IntVarArgs ODMap(*this, numO * numOD, 0, numV * numVD - 1);
+    Matrix<IntVarArgs> mODMap(ODMap, numO, numOD);
+        
+    // - All values must be distinct
+    distinct(*this, ODMap);
+    
+    // - Map to deliveries from same order
     for (int i = 0; i < numO; i++) {
-      rel(*this, Lateness[i] == 0);
-      rel(*this, TimeLag[i] == 0);
+      for (int d = 0; d < numOD; d++) {
+        rel(*this, element(D_Order, mODMap(i,d)) == i || d > O_Deliveries[i]);
+      }
+    }
+    
+    // - Break symmetries for unused deliveries
+    for (int i = 0; i < numO; i++) {
+      for (int d = 1; d < numOD; d++) {
+        // ODMap[o, d-1] < ODMap[o, d] if !Used[d-1]
+        rel(*this, mODMap(i, d-1) < mODMap(i, d) || d-1 < O_Deliveries[i]);
+      }      
+    }
+    for (int i = 1; i < numO; i++) {
+      // ODMap[o-1, max] < ODMap[o, min(unused)]
+      rel(*this, mODMap(i-1, numOD-1) < element(ODMap, i * numO + O_Deliveries[i]) || 
+                 O_Deliveries[i-1] == numOD-1 || O_Deliveries[i] == numOD-1);
+    }
+    
+    
+    // Define Lateness per order and TimeLags per order over order unloading times
+    for (int i = 0; i < numO; i++) {
+      Order &o = input.getOrder(i);
+      rel(*this, O_Lateness[i] == mO_tUnload(i, 0) - o.timeStart());
+      
+      for (int d = 1; d < numOD; d++) {
+        rel(*this, ((mO_tLag(i,d) == mO_tUnload(i, d) - mO_tUnload(i, d-1) - element(D_dT_Unloading, mODMap(i, d))) && (d < O_Deliveries[i])) ||
+                   ((mO_tLag(i,d) == 0) && (d >= O_Deliveries[i])) );
+      }
     }
     
     // Total costs
-    rel(*this, Cost == sum(Lateness) * input.getAlpha1() + sum(Waste) * input.getAlpha2() +
-                       sum(Preferred) * input.getAlpha3() + sum(TimeLag) * input.getAlpha4() +
+    rel(*this, Cost == sum(O_Lateness) * input.getAlpha1() + sum(Waste) * input.getAlpha2() +
+                       sum(Preferred) * input.getAlpha3() + sum(O_tLag) * input.getAlpha4() +
                        (sum(D_dT_travelTo) + sum(D_dT_travelFrom)) * input.getAlpha5());
     
     
