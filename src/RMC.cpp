@@ -245,10 +245,38 @@ public:
     }
     
     // Only one vehicle can be loaded at a station at a time
-    
+    for (int i = 0; i < input.getNumStations(); i++) {
+      Station &s = input.getStation(i);
+      
+      // True for every delivery loaded at station i
+      BoolVarArgs AtStation(*this, numV * numD, 0, 1);
+      IntArgs LoadTime(numV * numD);
+      
+      for (int d = 0; d < numV * numD; d++) {
+        rel(*this, AtStation[d] == (D_Station[d] == i));
+        
+        LoadTime[d] = s.loadingMinutes();
+      }
+      
+      unary(*this, D_tLoad, LoadTime, AtStation);
+    }
     
     // Only one vehicle can be unloaded at a construction site at a time
-    
+    // TODO this should be per construction yard, not order
+    for (int i = 0; i < numO; i++) {
+      Order &o = input.getOrder(i);
+      
+      BoolVarArgs AtYard(*this, numV * numD, 0, 1);
+      IntVarArgs D_t_unloaded(*this, numV * numD, 0, Int::Limits::max);
+      
+      for (int d = 0; d < numV * numD; d++) {
+        rel(*this, AtYard[d] == (D_Order[d] == i));
+        
+        rel(*this, D_t_unloaded[d] == D_tUnload[d] + D_dT_Unloading[d]);
+      }
+      
+      unary(*this, D_tUnload, D_dT_Unloading, D_t_unloaded, AtYard);
+    }
     
     // All orders must be fullfilled
     for (int i = 0; i < numO; i++) {

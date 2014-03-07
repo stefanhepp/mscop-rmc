@@ -193,10 +193,10 @@ void RMCInput::buildValueArrays()
     }
   }
   
-  //_travelTimesTo   = new int[_orders.size() * _stations.size()+1];
-  _travelTimesTo = (int*) malloc (_orders.size() * _stations.size() * sizeof(int*));
-  //_travelTimesFrom = new int[(_orders.size()+1) * (_stations.size()+1)];
-  _travelTimesTo = (int*) malloc (_orders.size() * _stations.size() * sizeof(int*));
+  //_travelTimesTo   = new int[_orders.size() * _stations.size()];
+  _travelTimesTo   = (int*) malloc (_orders.size() * _stations.size() * sizeof(int));
+  //_travelTimesFrom = new int[_orders.size() * _stations.size()];
+  _travelTimesFrom = (int*) malloc (_orders.size() * _stations.size() * sizeof(int));
   
   for (int i = 0; i < _orders.size(); i++) {
     Order *o = _orders[i];

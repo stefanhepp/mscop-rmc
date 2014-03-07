@@ -55,7 +55,7 @@ void ReadXML::print(){
       cout<<ite->_orderCode<<endl;
       cout<<ite->_dischargeRate<<endl;
       cout<<ite->_startTime<<endl;
-      cout<<"const iard"<<ite->_constructionYard._code<<endl;
+      cout<<"const yard"<<ite->_constructionYard._code<<endl;
       list<XMLStationDuration>::iterator site;
       for(site = ite->_constructionYard._stationDuration.begin(); site!= ite->_constructionYard._stationDuration.end(); site++){
         cout<< site->_drivingMinutes<< " code "<< site->_stationCode<<endl;
@@ -70,7 +70,7 @@ void ReadXML::print(){
     list<XMLStation>::iterator is;
     for(is = _stationList.begin(); is!= _stationList.end(); is++){
       cout<<"station "<<is->_stationCode<<endl;
-      cout<<"load minutes"<<is->_loadingMinutes<<endl;
+      cout<<"load minutes "<<is->_loadingMinutes<<endl;
     }
 
 }
