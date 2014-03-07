@@ -38,6 +38,10 @@ protected:
   // Cost function value
   IntVar Cost;
   
+  // --------------- Result values -------------------
+  
+  // Total amount of concrete poured per order
+  IntVarArray O_poured;
   
 public:
   /// problem construction
@@ -48,7 +52,8 @@ public:
     D_Station(*this, input.getNumVehicles() * input.getMaxDeliveries(), 0, input.getNumStations() - 1),
     D_tLoad(*this, input.getNumVehicles() * input.getMaxDeliveries(), 0, input.getMaxTimeStamp()), 
     D_tUnload(*this, input.getNumVehicles() * input.getMaxDeliveries(), 0, input.getMaxTimeStamp()),
-    Cost(*this, 0, Int::Limits::max)
+    Cost(*this, 0, Int::Limits::max),
+    O_poured(*this, input.getNumOrders(), 0, Int::Limits::max)
   {
     int numD = input.getMaxDeliveries();
     int numV = input.getNumVehicles();
@@ -92,50 +97,116 @@ public:
     // Required volumes of orders
     IntArgs O_reqPipeLengths(input.getNumOrders(), input.getOrderReqPipeLengths());
     
+    IntArgs O_preferredStation(input.getNumOrders(), input.getOrderPreferredStations());
+    
+    // Setup time per order
+    IntArgs O_dT_setup(input.getNumOrders(), input.getOrderSetupTimes());
+    
     // Total volume to pour per order
     IntArgs O_totalVolumes(input.getNumOrders(), input.getOrderTotalVolumes());
     
     // Volume of vehicles per order
     IntArgs V_volumes(input.getNumOrders() * input.getNumVehicles(), input.getOrderVehicleVolumes());
-    Matrix<IntArgs> mV_volumes(V_volumes, input.getNumOrders(), input.getNumVehicles());
     
     // Travel time from stations to yards
     IntArgs O_dt_travelTo(input.getNumOrders() * input.getNumStations(), input.getTravelTimesToYards());
-    Matrix<IntArgs> mO_dt_travelTo(O_dt_travelTo, input.getNumOrders(), input.getNumStations());
     
     // Travel time from yards to stations
     IntArgs O_dt_travelFrom(input.getNumOrders() * input.getNumStations(), input.getTravelTimesFromYards());
-    Matrix<IntArgs> mO_dt_travelFrom(O_dt_travelFrom, input.getNumOrders(), input.getNumStations());    
     
     // Station load times
     IntArgs S_tLoad(input.getNumStations(), input.getStationLoadTimes());
+        
     
+    // Time to travel to yard
+    IntVarArgs D_dT_travelTo(*this, numV * numD, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_dT_travelTo(D_dT_travelTo, numV, numD);
     
+    for (int i = 0; i < numV * numD; i++) {
+      rel(*this, (D_dT_travelTo[i] == element(O_dt_travelTo, D_Order[i] * numO + D_Station[i]) && D_Used[i]) ||
+                 (D_dT_travelTo[i] == 0 && !D_Used[i]));
+    }
     
+    // Time to travel back to station
+    // We ignore the trip back from the last delivery.. since the time to travel back
+    // only depends on the station to travel to, we can just assume we travel back to a fixed station and eliminate this value    
+    IntVarArgs D_dT_travelFrom(*this, numV * numD, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_dT_travelFrom(D_dT_travelFrom, numV, numD);
+    
+    for (int i = 0; i < numV; i++) {
+      for (int d = 1; d < numD; d++) {
+        rel(*this, (mD_dT_travelFrom(i, d-1) == element(O_dt_travelFrom, mD_Order(i, d-1) * numO + mD_Station(i,d)) && mD_Used(i,d)) ||
+                   (mD_dT_travelFrom(i, d-1) == 0 && !mD_Used(i,d)));
+      }
+      rel(*this, mD_dT_travelFrom(i, numD-1) == 0);
+    }
+
     // Timestamp of arrival at yard
     IntVarArgs D_t_arrival(*this, numV * numD, 0, Int::Limits::max);
     Matrix<IntVarArgs> mD_t_arrival(D_t_arrival, numV, numD);
     
     for (int i = 0; i < numV * numD; i++) {
-      rel(*this, D_t_arrival[i] == D_tLoad[i] + element(S_tLoad, D_Station[i]) +
-                                   element(O_dt_travelTo, D_Order[i] * numO + D_Station[i]));
+      rel(*this, D_t_arrival[i] == D_tLoad[i] + element(S_tLoad, D_Station[i]) + D_dT_travelTo[i]);
+    }
+
+    // Amount of concrete delivered by a delivery 
+    IntVarArgs D_delivered(*this, numV * numD, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_delivered(D_delivered, numV, numD);
+    
+    for (int i = 0; i < numV; i++) {
+      for (int d = 0; d < numD; d++) {
+        rel(*this, (mD_delivered(i,d) == element(V_volumes, mD_Order(i, d) * numO + i) && mD_Used(i,d)) ||
+                   (mD_delivered(i,d) == 0 && !mD_Used(i,d)));
+      }
     }
     
     // Time required for unloading
+    // TODO in case D_tUnload + D_dT_Unloading - D_tLoad > Tmax, we might unload faster, but we do not want this anyway.
+    
     IntVarArgs D_dT_Unloading(*this, numV * numD, 0, Int::Limits::max);
     Matrix<IntVarArgs> mD_dT_Unloading(D_dT_Unloading, numV, numD);
     
     for (int i = 0; i < numV; i++) {
       for (int d = 0; d < numD; d++) {
-        rel(*this, mD_dT_Unloading(i, d) == element(V_volumes, mD_Order(i, d) * numO + i) /
-                                            element(O_reqDischargeRates, mD_Order(i, d)));
+        rel(*this, mD_dT_Unloading(i, d) == mD_delivered(i,d) / element(O_reqDischargeRates, mD_Order(i, d)));
       }
     }
     
+    // Amount of concrete poured by a delivery (excluding bad concrete)
+    IntVarArgs D_poured(*this, numV * numD, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mD_poured(D_poured, numV, numD);
+    
+    for (int i = 0; i < numV; i++) {
+      for (int d = 0; d < numD; d++) {
+        rel(*this, mD_poured(i,d) == min( mD_delivered(i,d), 
+                                          (input.getTimeMax() - mD_tUnload(i,d) + mD_tLoad(i,d)) * 
+                                              element(O_reqDischargeRates, mD_Order(i,d)) 
+                                        ) );
+      }
+    }
+
+    
+    // Total amount poured per order
+    for (int i = 0; i < numO; i++) {
+      Order &o = input.getOrder(i);
+      
+      IntVarArgs volume(*this, numV * numD, 0, Int::Limits::max);
+      
+      for (int d= 0; d < numV * numD; d++) {
+        // Only in Gecode 4.2
+        // ite(*this, D_Used[d], D_poured[d], 0, volume[d]);
+        
+        rel(*this, (volume[d] == D_poured[d] && D_Used[d]) ||
+                   (volume[d] == 0 && !D_Used[d]));
+      }
+      
+      rel(*this, O_poured[i] == sum(volume));
+    }
+
     
     /// ---- add constraints ----
     
-    // First delivery of vehicle i must not start before V_i.available
+    // Loading of vehicle i must not start before V_i.available
     for (int i = 0; i < numV; i++) {
       rel(*this, (mD_tLoad(i, 0) >= input.getVehicle(i).availableFrom()) || !mD_Used(i, 0));
     }
@@ -151,20 +222,73 @@ public:
     }
     
     // Vehicle must have required pipeline length and discharge rate for orders
+    for (int i = 0; i < numV; i++) {
+      Vehicle &v = input.getVehicle(i);
+      for (int d = 0; d < numD; d++) {
+        rel(*this, element(O_reqPipeLengths, mD_Order(i,d)) <= v.pumpLength() || !mD_Used(i,d));
+        rel(*this, element(O_reqDischargeRates, mD_Order(i,d)) <= v.maxDischargeRate() || !mD_Used(i,d));
+      }
+    }
     
     // Loading can only start after vehicle arrived back at the station
+    for (int i = 0; i < numV; i++) {
+      for (int d = 1; d < numD; d++) {
+        rel(*this, mD_tUnload(i,d-1) + mD_dT_Unloading(i,d-1) + mD_dT_travelFrom(i,d-1) <= mD_tLoad(i,d) || !mD_Used(i,d));
+      }
+    }
     
     // Unloading can only start after the vehicle arrived at the yard
+    for (int i = 0; i < numV; i++) {
+      for (int d = 0; d < numD; d++) {
+        rel(*this, mD_t_arrival(i,d) <= mD_tUnload(i,d) - element(O_dT_setup, D_Order[i]) || !mD_Used(i,d));
+      }
+    }
+    
+    // Only one vehicle can be loaded at a station at a time
     
     
+    // Only one vehicle can be unloaded at a construction site at a time
+    
+    
+    // All orders must be fullfilled
+    for (int i = 0; i < numO; i++) {
+      Order &o = input.getOrder(i);
+      rel(*this, O_poured[i] >= o.totalVolume());
+    }
     
     
     /// ------ define cost function ----
+        
+    // Calculate waste
+    IntVarArgs Waste(*this, numO, 0, Int::Limits::max);
     
+    for (int i = 0; i < numO; i++) {
+      Order &o = input.getOrder(i);
+      
+      rel(*this, Waste[i] == O_poured[i] - o.totalVolume());
+    }
     
+    // Calculate preferred stations
+    BoolVarArgs Preferred(*this, numV * numD, 0, 1);
     
-    // Temporary for now
-    rel(*this, Cost == 0);
+    for (int d = 0; d < numV * numD; d++) {
+      rel(*this, Preferred[d] == (D_Station[d] == element(O_preferredStation, D_Order[d])));
+    }
+    
+    // Calculate lateness of first delivery and time lag of other deliveries
+    IntVarArgs Lateness(*this, numO, 0, Int::Limits::max);
+    
+    IntVarArgs TimeLag(*this, numV * numD, 0, Int::Limits::max);
+
+    for (int i = 0; i < numO; i++) {
+      rel(*this, Lateness[i] == 0);
+      rel(*this, TimeLag[i] == 0);
+    }
+    
+    // Total costs
+    rel(*this, Cost == sum(Lateness) * input.getAlpha1() + sum(Waste) * input.getAlpha2() +
+                       sum(Preferred) * input.getAlpha3() + sum(TimeLag) * input.getAlpha4() +
+                       (sum(D_dT_travelTo) + sum(D_dT_travelFrom)) * input.getAlpha5());
     
     
     /// ----------- branching -----------
@@ -188,9 +312,8 @@ public:
     D_Station.update(*this, share, rmc.D_Station);
     D_tLoad.update(*this, share, rmc.D_tLoad);
     D_tUnload.update(*this, share, rmc.D_tUnload);
-    
-    // Is this needed??
     Cost.update(*this, share, rmc.Cost);
+    O_poured.update(*this, share, rmc.O_poured);
   }
 
   virtual Space* copy(bool share) {
@@ -206,8 +329,10 @@ public:
   /// printing 
   
   void print() {
-    std::cout << "Solution:\n";
+    std::cout << "Deliveries per vehicle:\n";
     std::cout << Deliveries << std::endl;
+    std::cout << "Concrete poured per order:\n";
+    std::cout << O_poured << std::endl;
     std::cout << "Cost: " << Cost << std::endl;
   }
 

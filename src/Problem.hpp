@@ -212,6 +212,10 @@ public:
   
   const int* getOrderReqPipeLengths() { return _orderReqPipeLength; }
   
+  const int* getOrderSetupTimes() { return _orderSetupTimes; }
+  
+  const int* getOrderPreferredStations() { return _orderPreferredStations; }
+  
   // [order, station]
   const int* getTravelTimesToYards() { return _travelTimesTo; }
   
@@ -243,6 +247,8 @@ private:
   int*   _orderTotalVolumes;
   int*   _orderReqDischargeRates;
   int*   _orderReqPipeLength;
+  int*   _orderSetupTimes;
+  int*   _orderPreferredStations;
   
   int*   _stationLoadTimes;
   

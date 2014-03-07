@@ -163,6 +163,8 @@ void RMCInput::buildValueArrays()
   _orderReqDischargeRates = new int[_orders.size()];
   _orderReqPipeLength = new int[_orders.size()];
   _orderTotalVolumes = new int[_orders.size()];
+  _orderSetupTimes = new int[_orders.size()];
+  _orderPreferredStations = new int[_orders.size()];
   
   for (int i = 0; i < _orders.size(); i++) {
     Order *o = _orders[i];
@@ -170,6 +172,8 @@ void RMCInput::buildValueArrays()
     _orderReqDischargeRates[i] = o->dischargeRate();
     _orderReqPipeLength[i] = o->requiredPumpLength();
     _orderTotalVolumes[i] = o->totalVolume();
+    _orderSetupTimes[i] = o->dTimeSetup();
+    _orderPreferredStations[i] = o->preferredStation();
   }
   
   _stationLoadTimes = new int[_stations.size()];
