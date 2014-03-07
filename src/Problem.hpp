@@ -37,28 +37,28 @@ public:
 
   std::string name() { return _name; }
   
-  int requiredPumpLength() {return _requiredPumpLength;}
+  int requiredPumpLength() const {return _requiredPumpLength;}
 
   // dm3
-  int totalVolume() {return _totalVolume;}
+  int totalVolume() const {return _totalVolume;}
 
-  int preferredStation() {return _preferredStation;}
+  int preferredStation() const {return _preferredStation;}
 
-  int timeStart() {return _startTime;}
+  int timeStart() const {return _startTime;}
 
-  int dTimeSetup() {return _setupTime;}
+  int dTimeSetup() const {return _setupTime;}
 
   // dm3 / min
-  int dischargeRate() {return _dischargeRate;}
+  int dischargeRate() const {return _dischargeRate;}
   
-  bool maxVolumeAllowed() { return _maxVolumeAllowed; }
+  bool maxVolumeAllowed() const { return _maxVolumeAllowed; }
   
   //returns the time necessary to travel from station to current order
-  int fromStation(int station) {
+  int fromStation(int station) const {
     return _dTimeFromStations[station];
   }
   //returns the time necessary to travel from current order to station
-  int toStation(int station) {
+  int toStation(int station) const {
     return _dTimeToStations[station];
   }
 
@@ -98,19 +98,19 @@ public:
   
   virtual ~Vehicle() {}
   
-  std::string name() { return _name; }
+  std::string name() const { return _name; }
   
-  int pumpLength() {
+  int pumpLength() const {
     return _pumpLenght;
   }
   
   /// dm3 / min
-  int maxDischargeRate() {
+  int maxDischargeRate() const {
     return _maxDischargeRate;
   }
   
   // dm3
-  int volume(bool maxVolume) {
+  int volume(bool maxVolume) const {
     if (_maxVolume == _normalVolume) {
       return _maxVolume;
     }
@@ -120,7 +120,7 @@ public:
     return _normalVolume;
   }
   
-  int availableFrom() {
+  int availableFrom() const {
     return _availableFrom;
   }
 
@@ -140,9 +140,9 @@ public:
   : _name(name), _loadingMinutes(loadingMinutes) 
   {}
   
-  std::string name() { return _name; }
+  std::string name() const { return _name; }
   
-  int loadingMinutes() { return _loadingMinutes; }
+  int loadingMinutes() const { return _loadingMinutes; }
   
 private:
   std::string _name;
@@ -161,19 +161,19 @@ class RMCInput {
 public:
   RMCInput() {}
   
-  void loadProblem(char *filename);
+  void loadProblem(const char *filename);
   
-  int getTimeMax() { return 100; }
+  int getTimeMax() const { return 100; }
   
-  int getAlpha1() { return 10; }
+  int getAlpha1() const { return 10; }
   
-  int getAlpha2() { return 10; }
+  int getAlpha2() const { return 10; }
   
-  int getAlpha3() { return 1; }
+  int getAlpha3() const { return 1; }
  
-  int getAlpha4() { return 20; }
+  int getAlpha4() const { return 20; }
   
-  int getAlpha5() { return 20; }
+  int getAlpha5() const { return 20; }
   
   
   int getNumVehicles() const { return _vehicles.size(); }
@@ -192,41 +192,41 @@ public:
   
   int getStation(const std::string &code) const;
   
-  const std::vector<Order*>& getOrders() { return _orders; }
+  const std::vector<Order*>& getOrders() const { return _orders; }
   
-  const std::vector<Vehicle*>& getVehicles() { return _vehicles; }
+  const std::vector<Vehicle*>& getVehicles() const { return _vehicles; }
   
-  const std::vector<Station*>& getStations() { return _stations; }
+  const std::vector<Station*>& getStations() const { return _stations; }
   
-  Order &getOrder(int idx) { return *_orders[idx]; }
+  const Order &getOrder(int idx) const { return *_orders[idx]; }
   
-  Vehicle &getVehicle(int idx) { return *_vehicles[idx]; }
+  const Vehicle &getVehicle(int idx) const { return *_vehicles[idx]; }
   
-  Station &getStation(int idx) { return *_stations[idx]; }
+  const Station &getStation(int idx) const { return *_stations[idx]; }
   
 
-  const int* getOrderStartTimes() { return _orderStartTimes; }  
+  const int* getOrderStartTimes() const { return _orderStartTimes; }  
 
-  const int* getOrderTotalVolumes() { return _orderTotalVolumes; }
+  const int* getOrderTotalVolumes() const { return _orderTotalVolumes; }
 
   // [order, vehicle]
-  const int* getOrderVehicleVolumes() { return _orderVehicleVolumes; }
+  const int* getOrderVehicleVolumes() const { return _orderVehicleVolumes; }
   
-  const int* getOrderReqDischargeRates() { return _orderReqDischargeRates; }
+  const int* getOrderReqDischargeRates() const { return _orderReqDischargeRates; }
   
-  const int* getOrderReqPipeLengths() { return _orderReqPipeLength; }
+  const int* getOrderReqPipeLengths() const { return _orderReqPipeLength; }
   
-  const int* getOrderSetupTimes() { return _orderSetupTimes; }
+  const int* getOrderSetupTimes() const { return _orderSetupTimes; }
   
-  const int* getOrderPreferredStations() { return _orderPreferredStations; }
-  
-  // [order, station]
-  const int* getTravelTimesToYards() { return _travelTimesTo; }
+  const int* getOrderPreferredStations() const { return _orderPreferredStations; }
   
   // [order, station]
-  const int* getTravelTimesFromYards() { return _travelTimesFrom; }
+  const int* getTravelTimesToYards() const { return _travelTimesTo; }
   
-  const int* getStationLoadTimes() { return _stationLoadTimes; }
+  // [order, station]
+  const int* getTravelTimesFromYards() const { return _travelTimesFrom; }
+  
+  const int* getStationLoadTimes() const { return _stationLoadTimes; }
   
   
 private:

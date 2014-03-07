@@ -12,7 +12,21 @@
 
 using namespace Gecode;
 
-class RMC : public MinimizeSpace {
+class RMCOptions : public InstanceOptions {
+private:
+  RMCInput &Input;
+public:
+  RMCOptions(const char *name, RMCInput &input) 
+  : InstanceOptions(name), Input(input) {}
+  
+  void loadProblem() {
+    Input.loadProblem(instance());
+  }
+  
+  const RMCInput &getInput() const { return Input; }
+};
+
+class RMC : public MinimizeScript {
   
 protected:
   
@@ -49,16 +63,18 @@ protected:
 public:
   /// problem construction
 
-  RMC(RMCInput &input) 
-  : Deliveries(*this, input.getNumVehicles(), 0, input.getNumOrders() * input.getMaxDeliveries() - 1),
-    D_Order(*this, input.getMaxTotalDeliveries(), 0, input.getNumOrders() - 1),
-    D_Station(*this, input.getMaxTotalDeliveries(), 0, input.getNumStations() - 1),
-    D_tLoad(*this, input.getMaxTotalDeliveries(), 0, input.getMaxTimeStamp()),
-    D_tUnload(*this, input.getMaxTotalDeliveries(), 0, input.getMaxTimeStamp()),
+  RMC(const RMCOptions &opt) 
+  : Deliveries(*this, opt.getInput().getNumVehicles(), 0, opt.getInput().getNumOrders() * opt.getInput().getMaxDeliveries() - 1),
+    D_Order(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getNumOrders() - 1),
+    D_Station(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getNumStations() - 1),
+    D_tLoad(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTimeStamp()),
+    D_tUnload(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTimeStamp()),
     Cost(*this, 0, Int::Limits::max),
-    O_poured(*this, input.getNumOrders(), 0, Int::Limits::max),
-    O_Deliveries(*this, input.getNumOrders(), 0, input.getMaxDeliveries())
+    O_poured(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
+    O_Deliveries(*this, opt.getInput().getNumOrders(), 0, opt.getInput().getMaxDeliveries())
   {
+    const RMCInput &input = opt.getInput();
+    
     int numD = input.getMaxDeliveries();
     int numV = input.getNumVehicles();
     int numO = input.getNumOrders();
@@ -196,7 +212,7 @@ public:
     
     // Total amount poured per order
     for (int i = 0; i < numO; i++) {
-      Order &o = input.getOrder(i);
+      const Order &o = input.getOrder(i);
       
       IntVarArgs volume(*this, numV * numVD, 0, Int::Limits::max);
       
@@ -241,7 +257,7 @@ public:
     
     // Vehicle must have required pipeline length and discharge rate for orders
     for (int i = 0; i < numV; i++) {
-      Vehicle &v = input.getVehicle(i);
+      const Vehicle &v = input.getVehicle(i);
       for (int d = 0; d < numVD; d++) {
         rel(*this, element(O_reqPipeLengths, mD_Order(d, i)) <= v.pumpLength() || !mD_Used(d, i));
         rel(*this, element(O_reqDischargeRates, mD_Order(d, i)) <= v.maxDischargeRate() || !mD_Used(d, i));
@@ -264,7 +280,7 @@ public:
     
     // Only one vehicle can be loaded at a station at a time
     for (int i = 0; i < input.getNumStations(); i++) {
-      Station &s = input.getStation(i);
+      const Station &s = input.getStation(i);
       
       // True for every delivery loaded at station i
       BoolVarArgs AtStation(*this, numV * numVD, 0, 1);
@@ -280,7 +296,7 @@ public:
     // Only one vehicle can be unloaded at a construction site at a time
     // TODO this should be per construction yard, not order
     for (int i = 0; i < numO; i++) {
-      Order &o = input.getOrder(i);
+      const Order &o = input.getOrder(i);
       
       BoolVarArgs AtYard(*this, numV * numVD, 0, 1);
       IntVarArgs D_t_unloaded(*this, numV * numVD, 0, Int::Limits::max);
@@ -296,7 +312,7 @@ public:
     
     // All orders must be fullfilled
     for (int i = 0; i < numO; i++) {
-      Order &o = input.getOrder(i);
+      const Order &o = input.getOrder(i);
       rel(*this, O_poured[i] >= o.totalVolume());
     }
     
@@ -307,7 +323,7 @@ public:
     IntVarArgs Waste(*this, numO, 0, Int::Limits::max);
     
     for (int i = 0; i < numO; i++) {
-      Order &o = input.getOrder(i);
+      const Order &o = input.getOrder(i);
       
       rel(*this, Waste[i] == O_poured[i] - o.totalVolume());
     }
@@ -366,7 +382,7 @@ public:
     
     // Define Lateness per order and TimeLags per order over order unloading times
     for (int i = 0; i < numO; i++) {
-      Order &o = input.getOrder(i);
+      const Order &o = input.getOrder(i);
       rel(*this, O_Lateness[i] == mO_tUnload(0, i) - o.timeStart());
       
       for (int d = 1; d < numOD; d++) {
@@ -394,7 +410,7 @@ public:
   /// copy support
   
   RMC(bool share, RMC &rmc) 
-  : MinimizeSpace(share, rmc) 
+  : MinimizeScript(share, rmc) 
   {
     Deliveries.update(*this, share, rmc.Deliveries);
     D_Order.update(*this, share, rmc.D_Order);
@@ -418,55 +434,39 @@ public:
   
   /// printing 
   
-  void print() {
+  void print(std::ostream &out) const {
     // TODO print out per vehicle, skip unused deliveries
-    std::cout << "Orders per delivery:\n";
-    std::cout << D_Order << std::endl;
-    std::cout << "Stations per delivery:\n";
-    std::cout << D_Station << std::endl;
-    std::cout << "Load Times:\n";
-    std::cout << D_tLoad << std::endl;
-    std::cout << "Unload Times:\n";
-    std::cout << D_tUnload << std::endl;
+    out << "Orders per delivery:\n";
+    out << D_Order << std::endl;
+    out << "Stations per delivery:\n";
+    out << D_Station << std::endl;
+    out << "Load Times:\n";
+    out << D_tLoad << std::endl;
+    out << "Unload Times:\n";
+    out << D_tUnload << std::endl;
     
-    std::cout << "Number of deliveries per order:\n";
-    std::cout << O_Deliveries << std::endl;
-    std::cout << "Number of deliveries per vehicle:\n";
-    std::cout << Deliveries << std::endl;
-    std::cout << "Concrete poured per order:\n";
-    std::cout << O_poured << std::endl;
-    std::cout << "Cost: " << Cost << std::endl;
+    out << "Number of deliveries per order:\n";
+    out << O_Deliveries << std::endl;
+    out << "Number of deliveries per vehicle:\n";
+    out << Deliveries << std::endl;
+    out << "Concrete poured per order:\n";
+    out << O_poured << std::endl;
+    out << "Cost: " << Cost << std::endl;
   }
 
 };
 
 int main(int argc, char** argv) {
   
-  if (argc < 2) {
-    std::cerr << "Missing input file.\n";
-    return 1;
-  }
-  
   RMCInput input;
   
-  input.loadProblem(argv[1]);
+  RMCOptions opt("RMC", input);
+  //opt.instance(name[0]);
+  //opt.solutions(0);
+  opt.parse(argc,argv);
+  opt.loadProblem();
   
-  RMC *rmc = new RMC(input);
-
-  //Gist::bab(rmc);
-  BAB<RMC> bab(rmc);
-  
-  delete rmc;
-  
-  while (rmc = bab.next()) {
-    rmc->print();
-    std::cout << "Number of fails: " << bab.statistics().fail << "\n";
-    std::cout << "Number of nodes: " << bab.statistics().node << "\n";
-    std::cout << "Max depth: " << bab.statistics().depth << "\n";
-    std::cout << "Max memory: " << bab.statistics().memory << "\n";
-  }
-  
-  
+  MinimizeScript::run<RMC,BAB,RMCOptions>(opt);
   
   return 0;
 }

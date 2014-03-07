@@ -20,7 +20,7 @@
 
 class ReadXML {
 public:
-  ReadXML(char *filename);
+  ReadXML(const char *filename);
   
   virtual ~ReadXML();
 
@@ -53,7 +53,7 @@ private:
   XMLConstructionYard *readConstructionYard(xmlNode* cyard);
 
   //file to be parsed
-  char* _filename;
+  const char* _filename;
   /*
    * List of orders
    */

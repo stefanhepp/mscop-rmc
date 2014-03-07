@@ -49,7 +49,7 @@ void RMCInput::setTimesForOrder(Order* order, XMLOrder& xmlorder)
   }
 }
 
-void RMCInput::loadProblem(char* filename) {
+void RMCInput::loadProblem(const char* filename) {
   std::vector<XMLOrder*> orderList;
   std::vector<XMLVehicle*> vehicleList;
   std::vector<XMLStation*> stationList;

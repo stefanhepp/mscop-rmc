@@ -14,7 +14,7 @@
 
 using namespace std;
 
-ReadXML::ReadXML(char * filename) 
+ReadXML::ReadXML(const char * filename) 
 : _filename(filename)
 {
 }
