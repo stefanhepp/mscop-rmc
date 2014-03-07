@@ -42,6 +42,9 @@ protected:
   
   // Total amount of concrete poured per order
   IntVarArray O_poured;
+
+  // Amount of deliveries per order
+  IntVarArray O_Deliveries;
   
 public:
   /// problem construction
@@ -53,7 +56,8 @@ public:
     D_tLoad(*this, input.getNumVehicles() * input.getMaxDeliveries(), 0, input.getMaxTimeStamp()), 
     D_tUnload(*this, input.getNumVehicles() * input.getMaxDeliveries(), 0, input.getMaxTimeStamp()),
     Cost(*this, 0, Int::Limits::max),
-    O_poured(*this, input.getNumOrders(), 0, Int::Limits::max)
+    O_poured(*this, input.getNumOrders(), 0, Int::Limits::max),
+    O_Deliveries(*this, input.getNumOrders(), 0, input.getMaxDeliveries())
   {
     int numD = input.getMaxDeliveries();
     int numV = input.getNumVehicles();
@@ -204,6 +208,16 @@ public:
     }
 
     
+    // Deliveries per order
+    for (int i = 1; i < numO; i++) {
+      count(*this, D_Order, i, IRT_EQ, O_Deliveries[i]);
+    }
+    // Order 0 is special, need to substract all unused deliveries
+    IntVarArgs tmpCount(*this, 2, 0, numD * numD);
+    count(*this, D_Order, 0, IRT_EQ, tmpCount[0]);
+    rel(*this, O_Deliveries[0] == tmpCount[0] - (numD * numV - sum(D_Used)));
+    
+    
     /// ---- add constraints ----
     
     // Loading of vehicle i must not start before V_i.available
@@ -286,7 +300,7 @@ public:
     
     
     /// ------ define cost function ----
-        
+    
     // Calculate waste
     IntVarArgs Waste(*this, numO, 0, Int::Limits::max);
     
@@ -305,9 +319,19 @@ public:
     
     // Calculate lateness of first delivery and time lag of other deliveries
     IntVarArgs Lateness(*this, numO, 0, Int::Limits::max);
-    
     IntVarArgs TimeLag(*this, numV * numD, 0, Int::Limits::max);
 
+    // First create an array containing unloading start times per order
+    IntVarArgs O_tUnload(*this, numV * numD, 0, Int::Limits::max);
+    Matrix<IntVarArgs> mO_tUnload(O_tUnload, numV, numD);
+    
+    // Enforce sorting
+    for (int i = 0; i < numV; i++) {
+      for (int d = 1; d < numD; d++) {
+//        rel(*this, (mO_tUnload(i, d-1) < mO_tUnload(i,d) || (d >= O_Deliveries[
+      }
+    }
+    
     for (int i = 0; i < numO; i++) {
       rel(*this, Lateness[i] == 0);
       rel(*this, TimeLag[i] == 0);
@@ -342,6 +366,7 @@ public:
     D_tUnload.update(*this, share, rmc.D_tUnload);
     Cost.update(*this, share, rmc.Cost);
     O_poured.update(*this, share, rmc.O_poured);
+    O_Deliveries.update(*this, share, rmc.O_Deliveries);
   }
 
   virtual Space* copy(bool share) {
@@ -367,6 +392,8 @@ public:
     std::cout << "Unload Times:\n";
     std::cout << D_tUnload << std::endl;
     
+    std::cout << "Number of deliveries per order:\n";
+    std::cout << O_Deliveries << std::endl;
     std::cout << "Number of deliveries per vehicle:\n";
     std::cout << Deliveries << std::endl;
     std::cout << "Concrete poured per order:\n";
@@ -387,8 +414,8 @@ int main(int argc, char** argv) {
   input.loadProblem(argv[1]);
   
   RMC *rmc = new RMC(input);
-  
-  //Gist::bab(rmc);
+
+  Gist::bab(rmc);
   BAB<RMC> bab(rmc);
   
   delete rmc;

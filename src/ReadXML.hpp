@@ -28,17 +28,17 @@ public:
   
   void print();
 
-  void getOrdersList(std::vector<XMLOrder> &vec){
+  void getOrdersList(std::vector<XMLOrder*> &vec){
     vec.clear();
     std::copy( _orderList.begin(), _orderList.end(), std::back_inserter( vec ) );
   }
     
-  void getVehiclesList(std::vector<XMLVehicle> &vec){
+  void getVehiclesList(std::vector<XMLVehicle*> &vec){
     vec.clear();
     std::copy( _vehicleList.begin(), _vehicleList.end(), std::back_inserter( vec ) );
   }
 
-  void getStationsList(std::vector<XMLStation> &vec){
+  void getStationsList(std::vector<XMLStation*> &vec){
     vec.clear();
     std::copy( _stationList.begin(), _stationList.end(), std::back_inserter( vec ) );
   }
@@ -50,22 +50,22 @@ private:
   void readVehicles(xmlNode* vehicles);
   void readStations(xmlNode* stations);
 
-  XMLConstructionYard readConstructionYard(xmlNode* cyard);
+  XMLConstructionYard *readConstructionYard(xmlNode* cyard);
 
   //file to be parsed
   char* _filename;
   /*
    * List of orders
    */
-  std::list<XMLOrder> _orderList;
+  std::list<XMLOrder*> _orderList;
   /*
    * List of vehicles
    */
-  std::list<XMLVehicle> _vehicleList;
+  std::list<XMLVehicle*> _vehicleList;
   /*
    * List of stations
    */
-  std::list<XMLStation> _stationList;
+  std::list<XMLStation*> _stationList;
 };
 
 #endif /* READXML_HPP_ */

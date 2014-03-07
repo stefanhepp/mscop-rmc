@@ -14,10 +14,10 @@
 #include <cmath>
 
 
-int RMCInput::getStation(const char *code) const
+int RMCInput::getStation(const std::string &code) const
 {
-  if (!code) return -1;
-  std::map<std::string, int>::const_iterator it = _stationCodes.find(std::string(code));
+  if (code.empty()) return -1;
+  std::map<std::string, int>::const_iterator it = _stationCodes.find(code);
   
   if (it == _stationCodes.end()) {
     return -1;
@@ -28,8 +28,8 @@ int RMCInput::getStation(const char *code) const
 void RMCInput::setTimesForOrder(Order* order, XMLOrder& xmlorder)
 {
   std::list<_StationDuration_>::iterator ite;
-  for (ite = xmlorder._constructionYard._stationDuration.begin();
-       ite != xmlorder._constructionYard._stationDuration.end();
+  for (ite = xmlorder._constructionYard->_stationDuration.begin();
+       ite != xmlorder._constructionYard->_stationDuration.end();
        ite++) 
   {
     int idx = getStation(ite->_stationCode);
@@ -50,31 +50,31 @@ void RMCInput::setTimesForOrder(Order* order, XMLOrder& xmlorder)
 }
 
 void RMCInput::loadProblem(char* filename) {
-  std::vector<XMLOrder> orderList;
-  std::vector<XMLVehicle> vehicleList;
-  std::vector<XMLStation> stationList;
+  std::vector<XMLOrder*> orderList;
+  std::vector<XMLVehicle*> vehicleList;
+  std::vector<XMLStation*> stationList;
 
-  ReadXML *xmlReader = new ReadXML(filename);
-  xmlReader->parseFile();
+  ReadXML xmlReader(filename);
+  xmlReader.parseFile();
 
-  xmlReader->getOrdersList(orderList);
-  xmlReader->getVehiclesList(vehicleList);
-  xmlReader->getStationsList(stationList);
+  xmlReader.getOrdersList(orderList);
+  xmlReader.getVehiclesList(vehicleList);
+  xmlReader.getStationsList(stationList);
 
   //xmlReader->print();
   
   //compute the base time stamp
-  _baseTimeStamp = orderList[0]._unixTimeStamp;
+  _baseTimeStamp = orderList[0]->_unixTimeStamp;
 
   for (int i=1 ; i < orderList.size(); i++) {
-    if (_baseTimeStamp > orderList[i]._unixTimeStamp) {
-      _baseTimeStamp = orderList[i]._unixTimeStamp;
+    if (_baseTimeStamp > orderList[i]->_unixTimeStamp) {
+      _baseTimeStamp = orderList[i]->_unixTimeStamp;
     }
   }
 
   for (int i=0 ; i < vehicleList.size(); i++) {
-    if (_baseTimeStamp > vehicleList[i]._nextAvailabelTimeStampUnix) {
-      _baseTimeStamp = vehicleList[i]._nextAvailabelTimeStampUnix;
+    if (_baseTimeStamp > vehicleList[i]->_nextAvailabelTimeStampUnix) {
+      _baseTimeStamp = vehicleList[i]->_nextAvailabelTimeStampUnix;
     }
   }
 
@@ -90,9 +90,9 @@ void RMCInput::loadProblem(char* filename) {
   
   // load stations
   for(int i = 0 ; i < stationList.size(); i++) {
-    XMLStation &station = stationList[i];
+    XMLStation &station = *stationList[i];
     
-    if (!station._stationCode) continue;
+    if (station._stationCode.empty()) continue;
     
     _stationCodes.insert( std::pair<std::string,int>(std::string(station._stationCode), _stations.size()) );
     
@@ -103,7 +103,7 @@ void RMCInput::loadProblem(char* filename) {
   
   //treat each of the cars
   for (int i = 0; i < vehicleList.size(); i++) {
-    XMLVehicle &currentVehicle = vehicleList[i];
+    XMLVehicle &currentVehicle = *vehicleList[i];
     
     int timeStamp = (int)difftime(currentVehicle._nextAvailabelTimeStampUnix, _baseTimeStamp);
     
@@ -116,14 +116,14 @@ void RMCInput::loadProblem(char* filename) {
   
   //treat each of the orders
   for(int i = 0; i < orderList.size(); i++) {
-    XMLOrder &currentOrder = orderList[i];
+    XMLOrder &currentOrder = *orderList[i];
     
     int minTimeStamp = (int)difftime(currentOrder._unixTimeStamp, _baseTimeStamp);
     
     Order *o = new Order(currentOrder._orderCode, currentOrder._volume * 1000,(currentOrder._dischargeRate * (1000.0/60.0)), 
                          currentOrder._pumpLength, getStation(currentOrder._preferredStationCode), 
                          currentOrder._maxVolumeAllowed, minTimeStamp, 
-                         currentOrder._constructionYard._waitingMinutes, stationList.size());
+                         currentOrder._constructionYard->_waitingMinutes, stationList.size());
 
     setTimesForOrder(o, currentOrder);
 

@@ -19,7 +19,24 @@ ReadXML::ReadXML(char * filename)
 {
 }
 
-ReadXML::~ReadXML() {}
+ReadXML::~ReadXML() {
+  list<XMLOrder*>::iterator ito;
+  for (ito = _orderList.begin(); ito != _orderList.end(); ito++) {
+    delete *ito;
+  }
+  _orderList.clear();
+  list<XMLVehicle*>::iterator itv;
+  for (itv = _vehicleList.begin(); itv != _vehicleList.end(); itv++) {
+    delete *itv;
+  }
+  _vehicleList.clear();
+  list<XMLStation*>::iterator its;
+  for (its = _stationList.begin(); its != _stationList.end(); its++) {
+    delete *its;
+  }
+  _stationList.clear();
+
+}
 
 void ReadXML::parseFile() {
   xmlDoc *doc = NULL;
@@ -50,27 +67,27 @@ void ReadXML::parseFile() {
 
 void ReadXML::print(){
   //some information about orders
-  list<XMLOrder>::iterator ite;
+  list<XMLOrder*>::iterator ite;
     for(ite = _orderList.begin(); ite!=_orderList.end(); ite++ ){
-      cout<<ite->_orderCode<<endl;
-      cout<<ite->_dischargeRate<<endl;
-      cout<<ite->_startTime<<endl;
-      cout<<"const yard"<<ite->_constructionYard._code<<endl;
+      cout<<(*ite)->_orderCode<<endl;
+      cout<<(*ite)->_dischargeRate<<endl;
+      cout<<(*ite)->_startTime<<endl;
+      cout<<"const yard"<<(*ite)->_constructionYard->_code<<endl;
       list<XMLStationDuration>::iterator site;
-      for(site = ite->_constructionYard._stationDuration.begin(); site!= ite->_constructionYard._stationDuration.end(); site++){
+      for(site = (*ite)->_constructionYard->_stationDuration.begin(); site!= (*ite)->_constructionYard->_stationDuration.end(); site++){
         cout<< site->_drivingMinutes<< " code "<< site->_stationCode<<endl;
       }
     }
     //some information about vehicle
-    list<XMLVehicle>::iterator ve;
+    list<XMLVehicle*>::iterator ve;
     for(ve = _vehicleList.begin(); ve!= _vehicleList.end(); ve++){
-      cout<<"vehicle "<< ve->_vehicleType<<"  "<<ve->_vehicleCode<<"  "<<ve->_dischargeRate<<endl;
+      cout<<"vehicle "<< (*ve)->_vehicleType<<"  "<<(*ve)->_vehicleCode<<"  "<<(*ve)->_dischargeRate<<endl;
     }
     //some information about stations
-    list<XMLStation>::iterator is;
+    list<XMLStation*>::iterator is;
     for(is = _stationList.begin(); is!= _stationList.end(); is++){
-      cout<<"station "<<is->_stationCode<<endl;
-      cout<<"load minutes "<<is->_loadingMinutes<<endl;
+      cout<<"station "<<(*is)->_stationCode<<endl;
+      cout<<"load minutes "<<(*is)->_loadingMinutes<<endl;
     }
 
 }
@@ -124,62 +141,62 @@ void ReadXML::processFile(xmlNode * a_node)
  */
 void ReadXML::readOrders(xmlNode* order) {
   xmlNode * iter = NULL;
-  XMLOrder o;
+  XMLOrder *o = new XMLOrder();
 
   for (iter = order->children; iter; iter = iter->next) {
     if (!xmlStrcmp(iter->name, (const xmlChar*) "OrderCode")) {
-      o._orderCode = (char*)xmlNodeGetContent(iter);
+      o->_orderCode = (char*)xmlNodeGetContent(iter);
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "PumpLineLengthRequired")) {
-      o._pumpLength = atoi((char*)xmlNodeGetContent(iter));
+      o->_pumpLength = atoi((char*)xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "From")) {
-      o._startTime = (char*) xmlNodeGetContent(iter);
+      o->_startTime = (char*) xmlNodeGetContent(iter);
       struct tm t;
-      if (strptime(o._startTime, "%Y-%m-%dT%H:%M:%S", &t) == NULL)
+      if (strptime(o->_startTime.c_str(), "%Y-%m-%dT%H:%M:%S", &t) == NULL)
         cout << "error" << endl;
       else {
         time_t timeStamp = mktime(&t);
-        o._unixTimeStamp = timeStamp;
+        o->_unixTimeStamp = timeStamp;
       }
 
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "TotalVolumeM3")) {
-      o._volume = atof((char*)xmlNodeGetContent(iter));
+      o->_volume = atof((char*)xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "RequiredDischargeM3PerHour")) {
-      o._dischargeRate = atof((char*)xmlNodeGetContent(iter));
+      o->_dischargeRate = atof((char*)xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "PreferredStationCode")) {
-      o._preferredStationCode = ((char*)xmlNodeGetContent(iter));
+      o->_preferredStationCode = ((char*)xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "MaximumVolumeAllowed")) {
       if(!xmlStrcmp(xmlNodeGetContent(iter),(const xmlChar*)"true")){
-        o._maxVolumeAllowed = true;
-      } else o._maxVolumeAllowed = false;
+        o->_maxVolumeAllowed = true;
+      } else o->_maxVolumeAllowed = false;
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "IsPickUp")) {
       if(!xmlStrcmp(xmlNodeGetContent(iter),(const xmlChar*)"true")){
-              o._isPickup = true;
-      } else o._isPickup = false;
+              o->_isPickup = true;
+      } else o->_isPickup = false;
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "Priority")) {
-      o._priority = atoi((char*)xmlNodeGetContent(iter));
+      o->_priority = atoi((char*)xmlNodeGetContent(iter));
       continue;
     }
 
     //read construction yard information
     if (!xmlStrcmp(iter->name, (const xmlChar*) "ConstructionYard")) {
       XMLConstructionYard cyard;
-      o._constructionYard = readConstructionYard(iter);
+      o->_constructionYard = readConstructionYard(iter);
 
     }
   }
@@ -192,43 +209,43 @@ void ReadXML::readOrders(xmlNode* order) {
  */
 void ReadXML::readVehicles(xmlNode* vehicles) {
   xmlNode * iter = NULL;
-  XMLVehicle o;
+  XMLVehicle *o = new XMLVehicle();
 
   for (iter = vehicles->children; iter; iter = iter->next) {
 
     if (!xmlStrcmp(iter->name, (const xmlChar*) "VehicleCode")) {
-      o._vehicleCode = ((char*)xmlNodeGetContent(iter));
+      o->_vehicleCode = ((char*)xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "VehicleType")) {
-      o._vehicleType = ((char*)xmlNodeGetContent(iter));
+      o->_vehicleType = ((char*)xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "NormalVolume")) {
-      o._normalVolume = atoi((char*) xmlNodeGetContent(iter));
+      o->_normalVolume = atoi((char*) xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "PumpLineLength")) {
-      o._pumpLength = atoi((char*)xmlNodeGetContent(iter));
+      o->_pumpLength = atoi((char*)xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "MaximumVolume")) {
-      o._maximumVolume = atoi((char*) xmlNodeGetContent(iter));
+      o->_maximumVolume = atoi((char*) xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "DischargeM3PerHour")) {
-      o._dischargeRate = atof((char*) xmlNodeGetContent(iter));
+      o->_dischargeRate = atof((char*) xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name,(const xmlChar*) "NextAvailableStartDateTime")) {
-      o._nextAvailableTime = ((char*) xmlNodeGetContent(iter));
+      o->_nextAvailableTime = ((char*) xmlNodeGetContent(iter));
 
       tm t;
-      if (strptime(o._nextAvailableTime, "%Y-%m-%dT%H:%M:%S", &t) == NULL)
+      if (strptime(o->_nextAvailableTime.c_str(), "%Y-%m-%dT%H:%M:%S", &t) == NULL)
         cout << "error" << endl;
       else {
         time_t timeStamp = mktime(&t);
-        o._nextAvailabelTimeStampUnix = timeStamp;
+        o->_nextAvailabelTimeStampUnix = timeStamp;
       }
 
       continue;
@@ -244,16 +261,16 @@ void ReadXML::readVehicles(xmlNode* vehicles) {
 void ReadXML::readStations(xmlNode* stations) {
   xmlNode * iter = NULL;
 
-  XMLStation o;
+  XMLStation *o = new XMLStation();
 
   for (iter = stations->children; iter; iter = iter->next) {
 
     if (!xmlStrcmp(iter->name, (const xmlChar*) "StationCode")) {
-      o._stationCode = ((char*)xmlNodeGetContent(iter));
+      o->_stationCode = ((char*)xmlNodeGetContent(iter));
       continue;
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "LoadingMinutes")) {
-      o._loadingMinutes = atoi((char*)xmlNodeGetContent(iter));
+      o->_loadingMinutes = atoi((char*)xmlNodeGetContent(iter));
       continue;
     }
   }
@@ -263,25 +280,24 @@ void ReadXML::readStations(xmlNode* stations) {
 /*
  * traverse a node containing construction yards information and return a construction yard
  */
-XMLConstructionYard ReadXML::readConstructionYard(xmlNode* cyard) {
-  XMLConstructionYard cya;
+XMLConstructionYard *ReadXML::readConstructionYard(xmlNode* cyard) {
+  XMLConstructionYard *cya = new XMLConstructionYard();
   xmlNode* ci = NULL;
 
   for (ci = cyard->children; ci; ci = ci->next) {
     if (!xmlStrcmp(ci->name, (const xmlChar*) "ConstructionYardCode")) {
-      cya._code = (char*) xmlNodeGetContent(ci);
+      cya->_code = (char*) xmlNodeGetContent(ci);
       continue;
     }
 
     if (!xmlStrcmp(ci->name, (const xmlChar*) "WaitingMinutes")) {
-      cya._waitingMinutes = atoi((char*) xmlNodeGetContent(ci));
+      cya->_waitingMinutes = atoi((char*) xmlNodeGetContent(ci));
       continue;
     }
 
     //read Station duration here
     if (!xmlStrcmp(ci->name, (const xmlChar*) "StationDurations")) {
 
-      list<XMLStationDuration> stationDurations;
       xmlNode* constSite = NULL;
       /*
        * traverse all the station duration nodes and collect information from each of them
@@ -314,17 +330,13 @@ XMLConstructionYard ReadXML::readConstructionYard(xmlNode* cyard) {
 
           }
           //add another station duration info to the list of the construction yard
-          stationDurations.push_back(st);
+          cya->_stationDuration.push_back(st);
         }
 
       }
-      //copy the list to the construction site
-      cya._stationDuration = stationDurations;
       continue;
     }
-
   }
   //return the new construction site
   return cya;
-
 }

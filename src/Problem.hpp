@@ -20,7 +20,7 @@ static const int MAX_TRAVEL_TIME = 5000000;
 class Order {
 public:
   /// volumes in dm3, rates in dm3/min
-  Order(char *name, int vol, int dischargeRate, int pumpLength, int preferredStation,
+  Order(const std::string &name, int vol, int dischargeRate, int pumpLength, int preferredStation,
         bool maxVolumeAllowed, int startTime, int setupTime, int numStations)
   : _name(name),
     _totalVolume(vol), _dischargeRate(dischargeRate), 
@@ -89,7 +89,7 @@ private:
 class Vehicle {
 public:
   /// volumes in dm3, rates in dm3/min
-  Vehicle(char *name, int pumpLength, int maxDischargeRate, int normalVolume, 
+  Vehicle(const std::string &name, int pumpLength, int maxDischargeRate, int normalVolume, 
           int maxVolume, int availFrom)
   : _name(name),
     _pumpLenght(pumpLength), _maxDischargeRate(maxDischargeRate), 
@@ -136,7 +136,7 @@ private:
 
 class Station {
 public:
-  Station(char *name, int loadingMinutes) 
+  Station(const std::string &name, int loadingMinutes) 
   : _name(name), _loadingMinutes(loadingMinutes) 
   {}
   
@@ -186,7 +186,7 @@ public:
   
   int getMaxTimeStamp() const { return _maxTimeStamp; }
   
-  int getStation(const char *code) const;
+  int getStation(const std::string &code) const;
   
   const std::vector<Order*>& getOrders() { return _orders; }
   

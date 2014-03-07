@@ -13,8 +13,10 @@
 
 #include <list>
 
+#include <string>
+
 struct _StationDuration_{
-  char* _stationCode;
+  std::string _stationCode;
   int _drivingMinutes;
   /**
    * as a convention if the direction for the constructionYard is From then _direction is true
@@ -24,42 +26,46 @@ struct _StationDuration_{
 };
 
 struct _ConstructionYard_{
-  char* _code;
+  std::string _code;
   int _waitingMinutes;
   std::list<_StationDuration_> _stationDuration;
 };
 
 struct _Order_{
-  char* _orderCode;
+  std::string _orderCode;
   int _priority;
-  char* _preferredStationCode;
+  std::string _preferredStationCode;
   float _volume;
   bool _maxVolumeAllowed;
   float _dischargeRate;
   int _pumpLength;
-  char*_startTime;
+  std::string _startTime;
   time_t _unixTimeStamp;
   bool _isPickup;
-  _ConstructionYard_ _constructionYard;
+  _ConstructionYard_ *_constructionYard;
 
-  _Order_() : _orderCode(0), _priority(0), _preferredStationCode(0), _volume(0), _maxVolumeAllowed(false)
-    , _dischargeRate(0), _pumpLength(0), _startTime(0),_unixTimeStamp(0), _isPickup(false), _constructionYard(){
+  _Order_() : _priority(0), _volume(0), _maxVolumeAllowed(false)
+    , _dischargeRate(0), _pumpLength(0), _unixTimeStamp(0), _isPickup(false), _constructionYard(0){
   }
-} ;
+  
+  ~_Order_() {
+    if (_constructionYard) delete _constructionYard;
+  }
+};
 
 struct _Vehicle_{
-  char* _vehicleCode;
-  char* _vehicleType;
+  std::string _vehicleCode;
+  std::string _vehicleType;
   int _pumpLength;
   int _normalVolume;
   int _maximumVolume;
   float _dischargeRate;
-  char* _nextAvailableTime;
+  std::string _nextAvailableTime;
   time_t _nextAvailabelTimeStampUnix;
 };
 
 struct _Station_{
-  char* _stationCode;
+  std::string _stationCode;
   int _loadingMinutes;
 };
 
