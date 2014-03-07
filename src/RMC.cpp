@@ -287,10 +287,10 @@ public:
       IntArgs LoadTime = IntArgs::create(numV * numVD, s.loadingMinutes(), 0);
       
       for (int d = 0; d < numV * numVD; d++) {
-        rel(*this, AtStation[d] == (D_Station[d] == i));
+        rel(*this, AtStation[d] == (D_Station[d] == i && D_Used[d]));
       }
       
-      //unary(*this, D_tLoad, LoadTime, AtStation);
+      unary(*this, D_tLoad, LoadTime, AtStation);
     }
     
     // Only one vehicle can be unloaded at a construction site at a time
@@ -302,7 +302,7 @@ public:
       IntVarArgs D_t_unloaded(*this, numV * numVD, 0, Int::Limits::max);
       
       for (int d = 0; d < numV * numVD; d++) {
-        rel(*this, AtYard[d] == (D_Order[d] == i));
+        rel(*this, AtYard[d] == (D_Order[d] == i && D_Used[d]));
         
         rel(*this, D_t_unloaded[d] == D_tUnload[d] + D_dT_Unloading[d]);
       }
