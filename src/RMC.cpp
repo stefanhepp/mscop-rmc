@@ -277,7 +277,7 @@ public:
         rel(*this, mD_t_arrival(d, i) <= mD_tUnload(d, i) - element(O_dT_setup, D_Order[i]) || !mD_Used(d, i));
       }
     }
-    
+        
     // Only one vehicle can be loaded at a station at a time
     for (int i = 0; i < input.getNumStations(); i++) {
       const Station &s = input.getStation(i);
@@ -290,7 +290,7 @@ public:
         rel(*this, AtStation[d] == (D_Station[d] == i));
       }
       
-      unary(*this, D_tLoad, LoadTime, AtStation);
+      //unary(*this, D_tLoad, LoadTime, AtStation);
     }
     
     // Only one vehicle can be unloaded at a construction site at a time
@@ -314,8 +314,7 @@ public:
     for (int i = 0; i < numO; i++) {
       const Order &o = input.getOrder(i);
       rel(*this, O_poured[i] >= o.totalVolume());
-    }
-    
+    }    
     
     /// ------ define cost function ----
     
@@ -378,8 +377,7 @@ public:
       rel(*this, mODMap(numOD-1, i-1) < element(ODMap, i * numOD + O_Deliveries[i]) || 
                  O_Deliveries[i-1] == numOD-1 || O_Deliveries[i] == numOD-1);
     }
-    
-    
+        
     // Define Lateness per order and TimeLags per order over order unloading times
     for (int i = 0; i < numO; i++) {
       const Order &o = input.getOrder(i);
@@ -390,12 +388,12 @@ public:
                    ((mO_tLag(d, i) == 0) && (d >= O_Deliveries[i])) );
       }
     }
-    
+
     // Total costs
     rel(*this, Cost == sum(O_Lateness) * input.getAlpha1() + sum(Waste) * input.getAlpha2() +
                        sum(Preferred) * input.getAlpha3() + sum(O_tLag) * input.getAlpha4() +
                        (sum(D_dT_travelTo) + sum(D_dT_travelFrom)) * input.getAlpha5());
-    
+ 
     /// ----------- branching -----------
     
     branch(*this, Deliveries, INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
