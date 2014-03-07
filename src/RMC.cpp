@@ -128,7 +128,7 @@ public:
     Matrix<IntVarArgs> mD_dT_travelTo(D_dT_travelTo, numV, numVD);
     
     for (int i = 0; i < numV * numVD; i++) {
-      rel(*this, (D_dT_travelTo[i] == element(O_dt_travelTo, D_Order[i] * numO + D_Station[i]) && D_Used[i]) ||
+      rel(*this, (D_dT_travelTo[i] == element(O_dt_travelTo, D_Order[i] * numVD + D_Station[i]) && D_Used[i]) ||
                  (D_dT_travelTo[i] == 0 && !D_Used[i]));
     }
     
@@ -356,7 +356,7 @@ public:
     }
     for (int i = 1; i < numO; i++) {
       // ODMap[o-1, max] < ODMap[o, min(unused)]
-      rel(*this, mODMap(i-1, numOD-1) < element(ODMap, i * numO + O_Deliveries[i]) || 
+      rel(*this, mODMap(i-1, numOD-1) < element(ODMap, i * numOD + O_Deliveries[i]) || 
                  O_Deliveries[i-1] == numOD-1 || O_Deliveries[i] == numOD-1);
     }
     
