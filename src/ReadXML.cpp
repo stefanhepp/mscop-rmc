@@ -154,9 +154,10 @@ void ReadXML::readOrders(xmlNode* order) {
     }
     if (!xmlStrcmp(iter->name, (const xmlChar*) "From")) {
       o->_startTime = (char*) xmlNodeGetContent(iter);
-      struct tm t;
-      if (strptime(o->_startTime.c_str(), "%Y-%m-%dT%H:%M:%S", &t) == NULL)
-        cout << "error" << endl;
+      struct tm t = {0,0,0,0,0,0,0,0,0};
+      char *rs = strptime(o->_startTime.c_str(), "%Y-%m-%dT%H:%M:%S", &t);
+      if (!rs || (*rs != '\0' && *rs != '.'))
+        cout << "error parsing " << o->_startTime << endl;
       else {
         time_t timeStamp = mktime(&t);
         o->_unixTimeStamp = timeStamp;
@@ -240,9 +241,10 @@ void ReadXML::readVehicles(xmlNode* vehicles) {
     if (!xmlStrcmp(iter->name,(const xmlChar*) "NextAvailableStartDateTime")) {
       o->_nextAvailableTime = ((char*) xmlNodeGetContent(iter));
 
-      tm t;
-      if (strptime(o->_nextAvailableTime.c_str(), "%Y-%m-%dT%H:%M:%S", &t) == NULL)
-        cout << "error" << endl;
+      struct tm t = {0,0,0,0,0,0,0,0,0};
+      char *rs = strptime(o->_nextAvailableTime.c_str(), "%Y-%m-%dT%H:%M:%S", &t);
+      if (!rs || (*rs != '\0' && *rs != '.'))
+        cout << "error parsing " << o->_nextAvailableTime << endl;
       else {
         time_t timeStamp = mktime(&t);
         o->_nextAvailabelTimeStampUnix = timeStamp;
