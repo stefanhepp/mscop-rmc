@@ -94,7 +94,7 @@ void RMCInput::loadProblem(char* filename) {
     
     if (station._stationCode.empty()) continue;
     
-    _stationCodes.insert( std::pair<std::string,int>(std::string(station._stationCode), _stations.size()) );
+    _stationCodes.insert( std::pair<std::string,int>(station._stationCode, _stations.size()) );
     
     _stations.push_back( new Station(station._stationCode, station._loadingMinutes) );
     
@@ -130,6 +130,8 @@ void RMCInput::loadProblem(char* filename) {
     _orders.push_back(o);
   }
 
+  if (_vehicles.empty()) return;
+  
   // TODO make this more tight! (i.e., use a greedy alg. to assign yards to trucks
   
   // find the smallest vehicle capacity
