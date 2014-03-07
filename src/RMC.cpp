@@ -55,10 +55,16 @@ protected:
   // --------------- Result values -------------------
   
   // Total amount of concrete poured per order
-  IntVarArray O_poured;
+  IntVarArray O_Poured;
 
   // Amount of deliveries per order
   IntVarArray O_Deliveries;
+  
+  // Amount of waste per order
+  IntVarArray O_Waste;
+  
+  // Lateness of orders
+  IntVarArray O_Lateness;
   
 public:
   /// problem construction
@@ -70,8 +76,10 @@ public:
     D_tLoad(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTimeStamp()),
     D_tUnload(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTimeStamp()),
     Cost(*this, 0, Int::Limits::max),
-    O_poured(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
-    O_Deliveries(*this, opt.getInput().getNumOrders(), 0, opt.getInput().getMaxDeliveries())
+    O_Poured(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
+    O_Deliveries(*this, opt.getInput().getNumOrders(), 0, opt.getInput().getMaxDeliveries()),
+    O_Waste(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
+    O_Lateness(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max)
   {
     const RMCInput &input = opt.getInput();
     
@@ -224,7 +232,7 @@ public:
                    (volume[d] == 0 && D_Order[d] != i));
       }
       
-      rel(*this, O_poured[i] == sum(volume));
+      rel(*this, O_Poured[i] == sum(volume));
     }
 
     
@@ -313,18 +321,16 @@ public:
     // All orders must be fullfilled
     for (int i = 0; i < numO; i++) {
       const Order &o = input.getOrder(i);
-      rel(*this, O_poured[i] >= o.totalVolume());
+      rel(*this, O_Poured[i] >= o.totalVolume());
     }    
     
     /// ------ define cost function ----
     
     // Calculate waste
-    IntVarArgs Waste(*this, numO, 0, Int::Limits::max);
-    
     for (int i = 0; i < numO; i++) {
       const Order &o = input.getOrder(i);
       
-      rel(*this, Waste[i] == O_poured[i] - o.totalVolume());
+      rel(*this, O_Waste[i] == O_Poured[i] - o.totalVolume());
     }
     
     // Calculate preferred stations
@@ -336,7 +342,6 @@ public:
     
     
     // Calculate lateness of first delivery and time lag of other deliveries
-    IntVarArgs O_Lateness(*this, numO, 0, Int::Limits::max);
     IntVarArgs O_tLag(*this, numO * numOD, 0, Int::Limits::max);
     Matrix<IntVarArgs> mO_tLag(O_tLag, numOD, numO); 
     
@@ -390,13 +395,13 @@ public:
     }
 
     // Total costs
-    rel(*this, Cost == sum(O_Lateness) * input.getAlpha1() + sum(Waste) * input.getAlpha2() +
+    rel(*this, Cost == sum(O_Lateness) * input.getAlpha1() + sum(O_Waste) * input.getAlpha2() +
                        sum(Preferred) * input.getAlpha3() + sum(O_tLag) * input.getAlpha4() +
                        (sum(D_dT_travelTo) + sum(D_dT_travelFrom)) * input.getAlpha5());
  
     /// ----------- branching -----------
     
-    branch(*this, Deliveries, INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
+    branch(*this, Deliveries, INT_VAR_REGRET_MIN_MIN, INT_VAL_MAX);
     branch(*this, D_Order,    INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
     branch(*this, D_Station,  INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
     branch(*this, D_tLoad,    INT_VAR_REGRET_MIN_MIN, INT_VAL_MIN);
@@ -416,8 +421,10 @@ public:
     D_tLoad.update(*this, share, rmc.D_tLoad);
     D_tUnload.update(*this, share, rmc.D_tUnload);
     Cost.update(*this, share, rmc.Cost);
-    O_poured.update(*this, share, rmc.O_poured);
+    O_Poured.update(*this, share, rmc.O_Poured);
     O_Deliveries.update(*this, share, rmc.O_Deliveries);
+    O_Waste.update(*this, share, rmc.O_Waste);
+    O_Lateness.update(*this, share, rmc.O_Lateness);
   }
 
   virtual Space* copy(bool share) {
@@ -442,13 +449,18 @@ public:
     out << D_tLoad << std::endl;
     out << "Unload Times:\n";
     out << D_tUnload << std::endl;
+    out << std::endl;
     
     out << "Number of deliveries per order:\n";
     out << O_Deliveries << std::endl;
     out << "Number of deliveries per vehicle:\n";
     out << Deliveries << std::endl;
     out << "Concrete poured per order:\n";
-    out << O_poured << std::endl;
+    out << O_Poured << std::endl;
+    out << "Waste per order:\n";
+    out << O_Waste << std::endl;
+    out << "Lateness per order:\n";
+    out << O_Lateness << std::endl;
     out << "Cost: " << Cost << std::endl;
   }
 
