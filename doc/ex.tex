@@ -159,6 +159,72 @@ to determine, but it was assumed that this is slightly less of an issue than det
 
 \section{Modeling and Constaints}
 
+For each vehicle a list of deliveries containing different values per delivery exists. Those delivery lists have been implemented
+as one matrix over vehicles and deliveries per value to represent, linearized into IntVarArrays.
+
+\newcommand{\DOrder}{\text{D\_Order}}
+\newcommand{\DStation}{\text{D\_Station}}
+\newcommand{\DtLoad}{\text{D\_tLoad}}
+\newcommand{\DtUnload}{\text{D\_tUnload}}
+\newcommand{\maxD}{\text{maxD}}
+\newcommand{\VDeliveries}{\text{V\_Deliveries}}
+\newcommand{\ODeliveries}{\text{O\_Deliveries}}
+\newcommand{\DUsed}{\text{D\_Used}}
+\newcommand{\DdTtravelTo}{\text{D\_dTTravelTo}}
+\newcommand{\DdTtravelFrom}{\text{D\_dTTravelFrom}}
+
+\begin{itemize}
+\item $\DOrder_{vd}$: The order vehicle $v$ is serving with delivery $d$.
+\item $\DStation_{vd}$: The station vehicle $v$ is loaded at for delivery $d$.
+\item $\DtLoad_{vd}$: The time when loading vehicle $v$ for delivery $d$ starts.
+\item $\DtUnload_{vd}$: The time when unloading vehicle $v$ for delivery $d$ starts.
+\end{itemize}
+
+The size of each such matrix is $|V| \times |O| \cdot \maxD$, where $V$ is the list of available vehicles, $O$ the list of
+orders, and $\maxD$ is an upper bound of deliveries per order per vehicle, and is currently derived as the number of
+deliveries the smallest vehicle needs to fullfil the largest order on its own.
+
+The number of deliveries per vehicle is stored as an array $\VDeliveries$ of size $|V|$. A boolean array $\DUsed$
+defines for each delivery $vd$ if it contains valid values. To break symmetries, always the first $\VDeliveries_v$
+deliveries are used, i.e.,
+\[
+  \DUsed_{vd} = (d < \VDeliveries_v)
+\]
+
+All unused deliveries are set to a fixed value:
+\[
+\begin{array}[b]{l}
+  \DUsed_{vd} \vee \DOrder_{vd} = 0  \\
+  \DUsed_{vd} \vee \DStation_{vd} = 0 \\
+  \DUsed_{vd} \vee \DtLoad_{vd} = 0 \\
+  \DUsed_{vd} \vee \DtUnload_{vd} = 0
+\end{array}
+\]
+
+\medskip
+
+Based on those structures we can now define various helper variables that will allow us to define constraints and the
+cost function.
+
+The travel time from a station to a yard $\DdTtravelTo$ for delivery $vd$ is defined as
+\[
+\begin{array}[b]{l}
+(\DdTtravelTo_{vd} = \OtravelTo[\DOrder_{vd}, \DStation_{vd}] \wedge \DUsed_{vd}) \vee \\
+(\DdTtravelTo_{vd} = 0 \wedge \neg \DUsed_{vd})
+\end{array}
+\]
+
+The travel time from the yard back to the next station $\DdTtravelFrom$ of a delivery is defined to be 0 for the last
+delivery $d = |O| \cdot \maxD - 1$ and for all other deliveries as
+\[
+\begin{array}[b]{l}
+(\DdTtravelFrom_{v,d} = \OtravelFrom[\DOrder_{v,d+1}, \DStation_{v,d}] \wedge \DUsed_{v,d+1}) \vee \\
+(\DdTtravelFrom_{v,d} = 0 \wedge \neg \DUsed_{v,d+1})
+\end{array}
+\]
+
+
+
 
 
 
@@ -170,6 +236,9 @@ to determine, but it was assumed that this is slightly less of an issue than det
 \section{Evaluation of the Model}
 
 
+In hindsight, a model using unsorted sets for deliveries or a single list of deliveries (sorted by some value encoding
+both time stamps and orders for symmetry breaking) that entails more complex constraints but fewer variables might have
+been a better choice.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

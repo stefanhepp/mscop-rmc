@@ -246,7 +246,7 @@ public:
 
 
     // Deliveries per order
-    for (int i = 1; i < numO; i++) {
+    for (int i = 0; i < numO; i++) {
       count(*this, D_Order, i, IRT_EQ, O_Deliveries[i]);
     }
     // Order 0 is special, need to substract all unused deliveries
@@ -522,8 +522,8 @@ int main(int argc, char** argv) {
   RMCInput input;
   
   RMCOptions opt("RMC", input);
-  //opt.instance(name[0]);
-  opt.iterations(5000);
+  opt.iterations(0);
+  opt.solutions(0);
   opt.parse(argc,argv);
   opt.loadProblem();
   
