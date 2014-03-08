@@ -49,6 +49,27 @@ void RMCInput::setTimesForOrder(Order* order, XMLOrder& xmlorder)
   }
 }
 
+int RMCInput::getMinDeliveries(int order) const
+{
+  int minCapacity = 0;
+  
+  const Order &o = getOrder(order);
+  
+  for (int i = 0; i < _vehicles.size(); i++) {
+    const Vehicle &v = getVehicle(i);
+    if (v.maxDischargeRate() < o.dischargeRate() || v.pumpLength() < o.requiredPumpLength()) 
+      continue;
+    
+    if (minCapacity == 0) {
+      minCapacity = v.volume(o.maxVolumeAllowed());
+    } else {
+      minCapacity = std::min(minCapacity, v.volume(o.maxVolumeAllowed()));
+    }
+  }
+  
+  return o.totalVolume() / minCapacity;
+}
+
 void RMCInput::loadProblem(const char* filename) {
   std::vector<XMLOrder*> orderList;
   std::vector<XMLVehicle*> vehicleList;

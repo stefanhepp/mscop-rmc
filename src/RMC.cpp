@@ -66,8 +66,10 @@ protected:
   // Lateness of orders
   IntVarArray O_Lateness;
   
-  IntVarArray O_tUnload;
   IntVarArray ODMap;
+  IntVarArray O_tLag;
+  IntVarArray O_tUnload;
+  BoolVarArray O_Preferred;
 public:
   /// problem construction
 
@@ -78,13 +80,15 @@ public:
     D_tLoad(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTimeStamp()),
     D_tUnload(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTimeStamp()),
     Cost(*this, 0, Int::Limits::max),
-    O_Poured(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
-    O_Deliveries(*this, opt.getInput().getNumOrders(), 0, opt.getInput().getMaxDeliveries()),
+    O_Poured(*this, opt.getInput().getNumOrders(), 1, Int::Limits::max),
+    O_Deliveries(*this, opt.getInput().getNumOrders(), 1, opt.getInput().getMaxDeliveries()),
     O_Waste(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
     O_Lateness(*this, opt.getInput().getNumOrders(), 0, Int::Limits::max),
     
+    ODMap(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTotalDeliveries() - 1),
+    O_tLag(*this, opt.getInput().getMaxTotalDeliveries(), 0, Int::Limits::max),
     O_tUnload(*this, opt.getInput().getMaxTotalDeliveries(), 0, Int::Limits::max),
-    ODMap(*this, opt.getInput().getMaxTotalDeliveries(), 0, opt.getInput().getMaxTotalDeliveries() - 1)
+    O_Preferred(*this, opt.getInput().getMaxTotalDeliveries(), 0, 1)
   {
     const RMCInput &input = opt.getInput();
     
@@ -328,6 +332,11 @@ public:
       const Order &o = input.getOrder(i);
       rel(*this, O_Poured[i] >= o.totalVolume());
     }    
+        
+    // Minimum number of deliveries per order
+    for (int i = 0; i < numO; i++) {
+      rel(*this, O_Deliveries[i] >= input.getMinDeliveries(i));
+    }    
     
     /// ------ define cost function ----
     
@@ -339,15 +348,15 @@ public:
     }
     
     // Calculate preferred stations
-    BoolVarArgs Preferred(*this, numV * numVD, 0, 1);
+    //BoolVarArgs Preferred(*this, numV * numVD, 0, 1);
     
     for (int d = 0; d < numV * numVD; d++) {
-      rel(*this, Preferred[d] == (D_Station[d] == element(O_preferredStation, D_Order[d])));
+      rel(*this, O_Preferred[d] == (D_Station[d] != element(O_preferredStation, D_Order[d]) && D_Used[d]) );
     }
     
     
     // Calculate lateness of first delivery and time lag of other deliveries
-    IntVarArgs O_tLag(*this, numO * numOD, 0, Int::Limits::max);
+    //IntVarArgs O_tLag(*this, numO * numOD, 0, Int::Limits::max);
     Matrix<IntVarArgs> mO_tLag(O_tLag, numOD, numO); 
     
     // First create an array containing unloading start times per order
@@ -371,7 +380,8 @@ public:
     // - Map to deliveries from same order
     for (int i = 0; i < numO; i++) {
       for (int d = 0; d < numOD; d++) {
-        rel(*this, element(D_Order, mODMap(d, i)) == i || d > O_Deliveries[i]);
+        rel(*this, (element(D_Order, mODMap(d, i)) == i && d < O_Deliveries[i]) ||
+                   (element(D_Order, mODMap(d, i)) == 0 && d >= O_Deliveries[i]) );
       }
     }
     // - Map unload times
@@ -400,20 +410,34 @@ public:
         rel(*this, ((mO_tLag(d, i) == mO_tUnload(d, i) - mO_tUnload(d-1, i) - element(D_dT_Unloading, mODMap(d, i))) && (d < O_Deliveries[i])) ||
                    ((mO_tLag(d, i) == 0) && (d >= O_Deliveries[i])) );
       }
+      rel(*this, mO_tLag(0, i) == 0);
     }
 
     // Total costs
     rel(*this, Cost == sum(O_Lateness) * input.getAlpha1() + sum(O_Waste) * input.getAlpha2() +
-                       sum(Preferred) * input.getAlpha3() + sum(O_tLag) * input.getAlpha4() +
+                       sum(O_Preferred) * input.getAlpha3() + sum(O_tLag) * input.getAlpha4() +
                        (sum(D_dT_travelTo) + sum(D_dT_travelFrom)) * input.getAlpha5());
 
     /// ----------- branching -----------
     
-    branch(*this, Deliveries, INT_VAR_NONE, INT_VAL_SPLIT_MIN);
-    branch(*this, D_Order,    INT_VAR_NONE, INT_VAL_MIN);
-    branch(*this, D_Station,  INT_VAR_NONE, INT_VAL_MIN);
-    branch(*this, D_tLoad,    INT_VAR_NONE, INT_VAL_MIN);
-    branch(*this, D_tUnload,  INT_VAR_NONE, INT_VAL_MIN);
+    IntArgs initDel(numV);
+    for (int i = 0; i < numV; i++) { 
+      initDel[0] = numD;
+    }
+    
+    branch(*this, O_Deliveries,INT_VAR_NONE(), INT_VAL_RANGE_MIN());
+    branch(*this, Deliveries,  INT_VAR_NONE(), INT_VAL_NEAR_MIN(initDel));
+    branch(*this, D_tUnload,   INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, D_Order,     INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, D_tLoad,     INT_VAR_NONE(), INT_VAL_RANGE_MAX());
+    branch(*this, O_tLag,      INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, O_Lateness,  INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, O_tUnload,   INT_VAR_NONE(), INT_VAL_MIN());
+    
+    branch(*this, O_Poured,    INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, D_Station,   INT_VAR_NONE(), INT_VAL_MIN());
+
+    branch(*this, O_Preferred, INT_VAR_NONE(), INT_VAL_MIN());
   }
 
   virtual ~RMC() {}
@@ -435,7 +459,9 @@ public:
     O_Lateness.update(*this, share, rmc.O_Lateness);
     
     ODMap.update(*this, share, rmc.ODMap);
+    O_tLag.update(*this, share, rmc.O_tLag);
     O_tUnload.update(*this, share, rmc.O_tUnload);
+    O_Preferred.update(*this, share, rmc.O_Preferred);
   }
 
   virtual Space* copy(bool share) {
@@ -465,6 +491,10 @@ public:
     out << ODMap << std::endl;
     out << "O_tUnload:\n";
     out << O_tUnload << std::endl;
+    out << "O_Preferred:\n";
+    out << O_Preferred << std::endl;
+    out << "O_tLag:\n";
+    out << O_tLag << std::endl;
     out << std::endl;
     
     out << "Number of deliveries per order:\n";

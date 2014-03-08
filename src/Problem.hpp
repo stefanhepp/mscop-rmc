@@ -185,6 +185,9 @@ public:
   // Per order
   int getMaxDeliveries() const { return _maxDeliveries; }
   
+  int getMinDeliveries(int order) const;
+  
+  
   // overall deliveries
   int getMaxTotalDeliveries() const { return _orders.size() * _vehicles.size() * _maxDeliveries; }
   
