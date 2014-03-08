@@ -1,0 +1,182 @@
+\documentclass[a4paper]{article}
+
+\usepackage{fullpage}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{epsfig}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{latexsym}
+\usepackage{amssymb,amsmath,amsthm}
+\usepackage{cancel}
+\usepackage[table]{xcolor}
+\usepackage{listings}
+\usepackage{mdwlist}
+%\usepackage{pdflscape}
+%\usepackage{rotating}
+%\usepackage{mathrsfs}
+%\usepackage{natbib}
+%\usepackage{verbatim}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+
+
+%\usepackage{tikz}
+%\usetikzlibrary{shapes,arrows,backgrounds,fit}
+
+\usepackage{url}
+% should be the last package
+\usepackage{hyperref}
+% fix jumping to capture instead of figure
+\usepackage[all]{hypcap}
+
+
+\graphicspath{{./figures/}}
+
+
+\bibliographystyle{plain}
+
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{lem}[thm]{Lemma}
+\newtheorem{defin}[thm]{Definition}
+\newtheorem{cor}[thm]{Corollary}
+\newtheorem{cla}[thm]{Claim}
+
+
+
+\lstset{ %
+  language=Matlab,                % the language of the code
+  basicstyle=\tt\scriptsize,         % the size of the fonts that are used for the code
+  numbers=left,                   % where to put the line-numbers
+  xleftmargin=1cm,
+  stepnumber=1,                   % the step between two line-numbers. If it's 1, each line 
+                                  % will be numbered
+  numbersep=5pt,                  % how far the line-numbers are from the code
+%  backgroundcolor=\color{white},      % choose the background color. You must add \usepackage{color}
+%  showspaces=false,               % show spaces adding particular underscores
+%  showstringspaces=false,         % underline spaces within strings
+%  showtabs=false,                 % show tabs within strings adding particular underscores
+%  frame=single,                   % adds a frame around the code
+%  rulecolor=\color{black},        % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. commens (green here))
+%  tabsize=2,                      % sets default tabsize to 2 spaces
+%  captionpos=b,                   % sets the caption-position to bottom
+%  breaklines=true,                % sets automatic line breaking
+%  breakatwhitespace=false,        % sets if automatic breaks should only happen at whitespace
+%  title=\lstname,                   % show the filename of files included with \lstinputlisting;
+%                                  % also try caption instead of title
+%  keywordstyle=\color{blue},          % keyword style
+%  commentstyle=\color{dkgreen},       % comment style
+%  stringstyle=\color{mauve},         % string literal style
+%  escapeinside={\%*}{*)},            % if you want to add a comment within your code
+%  morekeywords={*,...}               % if you want to add more keywords to the set
+}
+
+
+\newcommand{\dm}{\text{dm}^3}
+\newcommand{\OtravelTo}{\text{O\_travelTo}}
+\newcommand{\OtravelFrom}{\text{O\_travelFrom}}
+\newcommand{\Vvolume}{\text{V\_volume}}
+
+\author{Stefan Hepp, e0026640}
+
+\title{Modeling and Solving Constrained Optimization Problems VU\\
+  {\normalsize RMC Exercise}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+This report describes the modeling and implementation of the Ready-Mixed Concrete (RMC) problem exercise using Gecode.
+
+\section{Instance Specification and Preprocessing}
+
+The problem instances are described using XML files. They contain lists of orders, vehicles and stations. The output
+nodes in the XML files are ignored.
+
+The provided data files contain many entries that are invalid, as well as problems that are not satisfiable. Vehicles
+that have neither a normal volume nor a maximum volume set are ignored, as well as stations without names. For each
+order at least one vehicle must exist which can fulfill this order, otherwise the problem does not have a solution. 
+
+In order to limit the model to integer variables, volumes of concrete are converted into integer units of $\dm$. Time
+spans such as the time to load vehicles are represented in minutes, while points in time such as the start time of an
+order are represented in minutes since the earliest time stamp in the problem specification. 
+Discharge rates of the vehicles are expressed as integer values in $\dm$ per minutes.
+
+While multiple orders for the same construction yard may exist but since travel
+times are specified per order, not per yard, the problem was slightly simplified by assuming every order is for a
+different construction yard, making construction yards and orders equivalent.
+In the following, we thus only consider orders. If multiple orders for the same construction yard may exist, the 
+constraint that allows only one vehicle to be unloaded per order must be modified to allow only one vehicle to be
+unloaded per yard, by using the yard identifier instead of the order identifier to check for overlaps.
+
+The travel times between stations and orders are converted from a variable length list per order to a single dense
+matrix $\OtravelTo$ containing the 
+travel times from stations to orders and to a matrix $\OtravelFrom$ containing the travel times from orders to yards.
+If no value for a pair of order and station is given in the problem specification, it is assumed that it is not possible
+to travel that route and the corresponding entries in the matrices are set to a very large value to avoid solutions that
+contain such a route.
+
+The amount of concrete that a vehicle can deliver may depend on the order. The volumes of all vehicles are precalculated
+and stored in a matrix $\Vvolume$ indexed by order and vehicle.
+
+\medskip
+In addition to the provided data files, a small example with just two orders, three vehicles and three stations was
+created to test and experiment with the model.
+
+\section{Representation of Deliveries}
+
+The expected output of the RMC problem is a schedule for all vehicles which order has to be fulfilled from which
+station at which point in time. There are at least three ways to represent this schedule. 
+
+\begin{itemize}
+\item A single list of deliveries
+ might contain a vehicle index, a station index and an order index per delivery.
+
+\item A list of deliveries for each order defines which vehicles serve this order.
+
+\item A list of deliveries for each vehicle defines which orders are served by this vehicle.
+\end{itemize}
+
+The issue with all three representations is that the number of deliveries is not fixed, and it is not possible to have
+the size of the delivery lists depend on decision variables.\footnote{It might be possible to store deliveries using
+sets, but this has not been explored for this model.}
+Instead, an upper bound on the number of deliveries is calculated, and an array of boolean variables defines per
+delivery if it is used or not.
+
+Since the first option uses only one single list, a tighter bound on the length of the list and thus on the number of
+variables might be found. However, the other ways of modeling the problem simplify some ordering constraints, therefore
+the first option was not further explored.
+
+For this exercise a lists of deliveries for each vehicle were used. The advantage over lists per order is that it is
+simpler to determine the travel times between stations and yards per vehicle, as the next trip of a vehicle can
+be easily determined. The disadvantage is that the lag time between deliveries for a given order is much more difficult
+to determine, but it was assumed that this is slightly less of an issue than determining the travel times for vehicles.
+
+
+\section{Modeling and Constaints}
+
+
+
+
+
+\section{Improving the Model}
+
+
+
+\section{Evaluation of the Model}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\clearpage
+%\nocite{*}
+%\bibliography{references}
+
+
+\end{document}
+

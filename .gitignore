@@ -2,6 +2,12 @@ build
 src/.kdev4
 src/src.kdev4
 
+doc/ex.pdf
+*.out
+*.log
+*.bbl
+*.blg
+*.aux
 .*.swp
 
 # Compiled Object files
