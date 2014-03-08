@@ -338,6 +338,11 @@ public:
       rel(*this, O_Deliveries[i] >= input.getMinDeliveries(i));
     }    
     
+    // Deliveries per vehicle are bounded by total deliveries per orders
+    for (int i = 0; i < numV; i++) {
+      rel(*this, Deliveries[i] <= sum(O_Deliveries));
+    }
+    
     /// ------ define cost function ----
     
     // Calculate waste
