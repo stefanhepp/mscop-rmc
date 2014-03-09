@@ -187,7 +187,8 @@ public:
     Matrix<IntVarArgs> mD_t_arrival(D_t_arrival, numVD, numV);
     
     for (int i = 0; i < numV * numVD; i++) {
-      rel(*this, D_t_arrival[i] == D_tLoad[i] + element(S_tLoad, D_Station[i]) + D_dT_travelTo[i]);
+      rel(*this, (D_t_arrival[i] == D_tLoad[i] + element(S_tLoad, D_Station[i]) + D_dT_travelTo[i] && D_Used[i]) ||
+                 (D_t_arrival[i] == 0 && !D_Used[i]) );
     }
 
     // Amount of concrete delivered by a delivery 
@@ -246,7 +247,7 @@ public:
 
 
     // Deliveries per order
-    for (int i = 0; i < numO; i++) {
+    for (int i = 1; i < numO; i++) {
       count(*this, D_Order, i, IRT_EQ, O_Deliveries[i]);
     }
     // Order 0 is special, need to substract all unused deliveries
@@ -266,7 +267,7 @@ public:
     for (int d = 0; d < numV * numVD; d++) {
       rel(*this, D_tUnload[d] >= element(O_tStart, D_Order[d]) || !D_Used[d]);
     }
-    
+   
     // Vehicles start at station 0
     for (int i = 0; i < numV; i++) {
       rel(*this, mD_Station(0, i) == 0);
