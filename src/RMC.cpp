@@ -430,22 +430,21 @@ public:
     
     IntArgs initDel(numV);
     for (int i = 0; i < numV; i++) { 
-      initDel[0] = numD;
+      initDel[0] = numO;
     }
     
     branch(*this, O_Deliveries,INT_VAR_NONE(), INT_VAL_RANGE_MIN());
-    //branch(*this, Deliveries,  INT_VAR_NONE(), INT_VAL_NEAR_MIN(initDel));
-    branch(*this, D_tUnload,   INT_VAR_NONE(), INT_VAL_MIN());
-    branch(*this, D_Order,     INT_VAR_NONE(), INT_VAL_MIN());
-    branch(*this, D_tLoad,     INT_VAR_NONE(), INT_VAL_RANGE_MAX());
-    branch(*this, O_tLag,      INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, Deliveries,  INT_VAR_NONE(), INT_VAL_NEAR_MAX(initDel));
     branch(*this, O_Lateness,  INT_VAR_NONE(), INT_VAL_MIN());
-    branch(*this, O_tUnload,   INT_VAR_NONE(), INT_VAL_MIN());
-    
-    branch(*this, O_Poured,    INT_VAR_NONE(), INT_VAL_MIN());
-    branch(*this, D_Station,   INT_VAR_NONE(), INT_VAL_MIN());
-
+    branch(*this, O_tLag,      INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, D_Order,     INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, O_Poured,    INT_VAR_NONE(), INT_VAL_MIN());    
     branch(*this, O_Preferred, INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, D_Station,   INT_VAR_NONE(), INT_VAL_MIN());
+    
+    branch(*this, D_tUnload,   INT_VAR_NONE(), INT_VAL_MIN());
+    branch(*this, D_tLoad,     INT_VAR_NONE(), INT_VAL_RANGE_MAX());
+    branch(*this, O_tUnload,   INT_VAR_NONE(), INT_VAL_MIN());
   }
 
   virtual ~RMC() {}

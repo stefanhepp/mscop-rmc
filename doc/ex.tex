@@ -446,15 +446,51 @@ of deliveries per order.
 \end{array}
 \]
 
+Branching was initially set up to branch first on the number of deliveries per vehicle ($\DDeliveries$), then on the order to fulful per
+per order ($\DOrder$), the station to use per order ($\DStation$) and the loading start time $\DtLoad$ and the unloading
+start time $\DtUnload$. All other values in the model can be propagated from those values. Branching was set up to start
+with a minimal value.
 
+As a result, the brancher typically initially found a single solution very quickly which consisted performing nearly all
+deliveries with a single vehicle. However, even for a very small problem, subsequent better solutions were not found
+even after several minutes of searching. 
 
+The model was then improved by adding containts that define a lower bound on the number of deliveries required for each
+order, based on the size of the largest vehicle and the total volume of concrete required by an order. The branching
+order was changed to start with a minimal number of deliveries per order $\ODeliveries$, and then to pick a number of
+deliveries per vehicle (in order to keep the number of deliveries that need to be considered for branching low).
+Afterwards, branching was performed on the individual cost factors such as the lateness, the amount of concrete poured (and thus the amount
+of waste per order) and the lag. The downside of this branching strategy is though that it may take a large amount of
+time to find at least one solution if the orders cannot be fulfilled with zero lag and lateness.
 
-\section{Evaluation of the Model}
+The biggest issue with this model however was that the solver very early decided on
+delivering almost all orders with a single vehicle, and then would search through a huge number of various start and
+unloading time variations before it would actually start to try spreading the deliveries over multiple vehicles.
+Depending on the order and the setup of the branchers, the solver would either find some initial solution or start out
+with an unsatisfiable schedule and then branch indefinitely on the actual loading and unloading times.
+Due to this, in nearly no cases could any sufficiently good schedule be found. 
 
+\medskip
+In hindsight, a model using a single list of deliveries (sorted by some value encoding
+both the sequence of the deliveries in time and the orders to fulfill in order to break symmetries) that entails more complex constraints but fewer variables might have
+been a better choice. Levels in the search tree might then correspond to individual deliveries, effectively making the depth of
+the search tree proportional to the number of deliveries required to fulfill all orders. Instead of deciding on the actual
+time stamps of the schedule of the deliveries, it should be sufficient and much more efficient to decide only on the actual
+sequence of deliveries to perform. Instead of checking for overlaps of loading and unloading actions explicitly in the
+model, the actual time table for the vehicles could be calculated after the sequence of deliveres has been decided on,
+purely for calculating the cost of the schedule.
 
-In hindsight, a model using unsorted sets for deliveries or a single list of deliveries (sorted by some value encoding
-both time stamps and orders for symmetry breaking) that entails more complex constraints but fewer variables might have
-been a better choice.
+Furthermore, while arranging deliveries per order might have required more complex constraints to
+determine the cost for returning from one order to a station where it should be loaded for the next delivery, it would
+have eliminated the problem of deciding for each vehicle how many deliveries it must take, which might have big
+benefits for the search tree exploration.
+
+In any case, more dynamic branching heuristics are needed to get a better initial utilization of all available
+vehicles and to find consistent solutions with a relatively low cost value early, so that only small improvements 
+to the schedule are needed to find good solutions.
+
+%One of the biggest drawback of the model is the explicit modeling of time as decision variables. This creates a 
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

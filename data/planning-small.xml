@@ -115,7 +115,7 @@
       <VehicleType>Pump</VehicleType>
       <PumpLineLength>0</PumpLineLength>
       <NormalVolume>10</NormalVolume>
-      <MaximumVolume>10</MaximumVolume>
+      <MaximumVolume>12</MaximumVolume>
       <DischargeM3PerHour>18</DischargeM3PerHour>
       <NextAvailableStartDateTime>2011-01-11T09:00:19.405274+01:00</NextAvailableStartDateTime>
     </Vehicle>
