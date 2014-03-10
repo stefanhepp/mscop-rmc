@@ -477,7 +477,7 @@
       <PumpLineLength>0</PumpLineLength>
       <NormalVolume>10</NormalVolume>
       <MaximumVolume>11</MaximumVolume>
-      <DischargeM3PerHour>8</DischargeM3PerHour>
+      <DischargeM3PerHour>10</DischargeM3PerHour>
       <NextAvailableStartDateTime>2011-01-10T14:45:26.0466756+01:00</NextAvailableStartDateTime>
     </Vehicle>
     <Vehicle>
@@ -486,7 +486,7 @@
       <PumpLineLength>0</PumpLineLength>
       <NormalVolume>8</NormalVolume>
       <MaximumVolume>9</MaximumVolume>
-      <DischargeM3PerHour>8</DischargeM3PerHour>
+      <DischargeM3PerHour>10</DischargeM3PerHour>
       <NextAvailableStartDateTime>2011-01-10T14:45:26.0466756+01:00</NextAvailableStartDateTime>
     </Vehicle>
     <Vehicle>

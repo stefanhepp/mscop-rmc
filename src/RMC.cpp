@@ -226,7 +226,6 @@ public:
                                         ) );
       }
     }
-
     
     // Total amount poured per order
     for (int i = 0; i < numO; i++) {
@@ -313,15 +312,18 @@ public:
     
     // Only one vehicle can be unloaded at a construction site at a time
     // TODO this should be per construction yard, not order
+    IntVarArgs D_t_unloaded(*this, numV * numVD, 0, Int::Limits::max);
+
+    for (int d = 0; d < numV * numVD; d++) {
+      rel(*this, D_t_unloaded[d] == D_tUnload[d] + D_dT_Unloading[d]);
+    }
+    
     for (int i = 0; i < numO; i++) {
       const Order &o = input.getOrder(i);
       
       BoolVarArgs AtYard(*this, numV * numVD, 0, 1);
-      IntVarArgs D_t_unloaded(*this, numV * numVD, 0, Int::Limits::max);
       
       for (int d = 0; d < numV * numVD; d++) {
-        rel(*this, AtYard[d] == (D_Order[d] == i && D_Used[d]));
-        
         rel(*this, D_t_unloaded[d] == D_tUnload[d] + D_dT_Unloading[d]);
       }
       
@@ -332,7 +334,7 @@ public:
     for (int i = 0; i < numO; i++) {
       const Order &o = input.getOrder(i);
       rel(*this, O_Poured[i] >= o.totalVolume());
-    }    
+    }
         
     // Minimum number of deliveries per order
     for (int i = 0; i < numO; i++) {
@@ -399,7 +401,7 @@ public:
       for (int d = 1; d < numOD; d++) {
         // ODMap[o, d-1] < ODMap[o, d] if !Used[d-1]
         rel(*this, mODMap(d-1, i) < mODMap(d, i) || d-1 < O_Deliveries[i]);
-      }      
+      }
     }
     for (int i = 1; i < numO; i++) {
       // ODMap[o-1, max] < ODMap[o, min(unused)]
@@ -432,7 +434,7 @@ public:
     }
     
     branch(*this, O_Deliveries,INT_VAR_NONE(), INT_VAL_RANGE_MIN());
-    branch(*this, Deliveries,  INT_VAR_NONE(), INT_VAL_NEAR_MIN(initDel));
+    //branch(*this, Deliveries,  INT_VAR_NONE(), INT_VAL_NEAR_MIN(initDel));
     branch(*this, D_tUnload,   INT_VAR_NONE(), INT_VAL_MIN());
     branch(*this, D_Order,     INT_VAR_NONE(), INT_VAL_MIN());
     branch(*this, D_tLoad,     INT_VAR_NONE(), INT_VAL_RANGE_MAX());
@@ -527,6 +529,13 @@ int main(int argc, char** argv) {
   opt.solutions(0);
   opt.parse(argc,argv);
   opt.loadProblem();
+  
+  for (int i = 0; i < opt.getInput().getNumOrders(); i++) {
+    if (opt.getInput().getMinDeliveries(i) == -1) {
+      std::cout << "No vehicles available for order " << opt.getInput().getOrder(i).name() << "\n";
+      return 1;
+    }
+  }
   
   MinimizeScript::run<RMC,BAB,RMCOptions>(opt);
   

@@ -76,7 +76,7 @@
 \newcommand{\dm}{\text{dm}^3}
 \newcommand{\OtravelTo}{\text{O\_travelTo}}
 \newcommand{\OtravelFrom}{\text{O\_travelFrom}}
-\newcommand{\Vvolume}{\text{V\_volume}}
+\newcommand{\VVolume}{\text{V\_Volume}}
 
 \author{Stefan Hepp, e0026640}
 
@@ -121,7 +121,7 @@ to travel that route and the corresponding entries in the matrices are set to a 
 contain such a route.
 
 The amount of concrete that a vehicle can deliver may depend on the order. The volumes of all vehicles are precalculated
-and stored in a matrix $\Vvolume$ indexed by order and vehicle.
+and stored in a matrix $\VVolume$ indexed by order and vehicle.
 
 \medskip
 In addition to the provided data files, a small example with just two orders, three vehicles and three stations was
@@ -165,6 +165,7 @@ as one matrix over vehicles and deliveries per value to represent, linearized in
 \newcommand{\DOrder}{\text{D\_Order}}
 \newcommand{\DStation}{\text{D\_Station}}
 \newcommand{\DtLoad}{\text{D\_tLoad}}
+\newcommand{\SdtLoad}{\text{S\_dTLoad}}
 \newcommand{\DtUnload}{\text{D\_tUnload}}
 \newcommand{\maxD}{\text{maxD}}
 \newcommand{\VDeliveries}{\text{V\_Deliveries}}
@@ -172,6 +173,15 @@ as one matrix over vehicles and deliveries per value to represent, linearized in
 \newcommand{\DUsed}{\text{D\_Used}}
 \newcommand{\DdTtravelTo}{\text{D\_dTTravelTo}}
 \newcommand{\DdTtravelFrom}{\text{D\_dTTravelFrom}}
+\newcommand{\DtArrival}{\text{D\_tArrival}}
+\newcommand{\DDelivered}{\text{D\_Delivered}}
+\newcommand{\DdTUnloading}{\text{D\_dTUnloading}}
+\newcommand{\DPoured}{\text{D\_Poured}}
+\newcommand{\OPoured}{\text{O\_Poured}}
+\newcommand{\OReqDischargeRate}{\text{O\_ReqDischargeRate}}
+\newcommand{\Tmax}{T_\text{max}}
+\newcommand{\OstartTime}{\text{O\_startTime}}
+
 
 \begin{itemize}
 \item $\DOrder_{vd}$: The order vehicle $v$ is serving with delivery $d$.
@@ -223,13 +233,219 @@ delivery $d = |O| \cdot \maxD - 1$ and for all other deliveries as
 \end{array}
 \]
 
+The arrival time $\DtArrival$ of vehicle $v$ at the yard for delivery $d$ depends on the travel time of the vehicle plus
+the time $\SdtLoad_s$ to load a vehicle at station $s$
+\[
+\begin{array}[b]{l}
+(\DtArrival_{vd} = \DtLoad_{vd} + \SdtLoad[\DStation_{vd}] + \DdTtravelTo_{vd} \wedge \DUsed_{vd}) \vee \\
+(\DtArrival_{vd} = 0 \wedge \neg \DUsed_{vd})
+\end{array}
+\]
+
+The amount of concrete delivered $\DDelivered$ by a vehicle at a construction site depends on the order
+\[
+\begin{array}[b]{l}
+(\DDelivered_{vd} = \VVolume[\DOrder_{vd}] \wedge \DUsed_{vd}) \vee \\
+(\DDelivered_{vd} = 0 \wedge \neg \DUsed_{vd})
+\end{array}
+\]
+
+For the time $\DdTUnloading$ required to unload a vehicle we simplify the problem by assuming that a vehicle is
+completely unloaded at the discharge rate $\OReqDischargeRate$ defined by the order, even if the concrete goes bad.
+\[
+\DdTUnloading_{vd} = \frac{\DDelivered_{vd}}{ \OReqDischargeRate[ \DOrder_{vd} ]}
+\]
+
+Finally, the amount of concrete $\DPoured$ poured by a vehicle $v$ for a delivery $d$ however depends on the loading time. The amount of concrete delivered
+is reduced if the time it takes to deliver the concrete exceeds $\Tmax$ = 100 minutes
+\[
+\DPoured_{vd} = \min( \DDelivered_{vd}, (\Tmax - \DtUnload_{vd} + \DtLoad_{vd]}) \cdot \OReqDischargeRate[\DOrder_{vd}] ) 
+\]
+
+\newcommand{\ODVolume}{\text{OD\_Volume}}
+
+In order to calculate the amount poured per order $\OPoured$ for an order $o$, we sum up all volumes delivered for order $o$ in a
+temporary array $\ODVolume_o$
+\[
+\begin{array}[b]{l}
+(\ODVolume_{o,vd} = \DPoured_{vd} \wedge \DOrder_{vd} = o) \vee \\
+(\ODVolume_{o,vd} = 0 \wedge \DOrder_{vd} \not = o)
+\end{array}
+\]
+
+\[
+\OPoured_o = \sum{\ODVolume_o} 
+\]
+
+Finally, we calculate the number of deliveries $\ODeliveries$ per order $o$. For this, the count constraint can be used, but
+order 0 has to be handled specially, as this includes all unused orders. 
+\[
+\ODeliveries_o = \left\{
+\begin{array}{l l}
+\text{count}(\DOrder, o) - (|V| \cdot |O| \cdot \maxD - \sum{\DUsed}) & \quad \text{if $o = 0$} \\
+\text{count}(\DOrder, o) & \quad \text{else}
+\end{array}
+\right.
+\]
+
+\section{Constraints}
+
+All vehicles $v$ are defined to start all from the first station.
+\[
+\DStation_{v,0} = 0
+\]
+
+Vehicles are only available from a predefined time $\text{V\_availableFrom}_v$ for loading, and must not start unloading for an order before the 
+order start time $\OstartTime_o$.
+\[
+\DtLoad_{v,0} \geq \text{V\_availableFrom}_v \vee \neg \DUsed_{v,0}
+\]
+\[
+\DtUnload_{v,d} \geq \OstartTime[ \DUsed_{v,d} ] \vee \neg \DUsed_{v,d}
+\]
+
+All vehicles $v$ must match the requirements of the orders for the length of the pipeline $\text{O\_reqPipeLength}$ and the discharge rate $\text{O\_reqDischargeRate}$.
+\[
+\text{O\_reqPipeLength}[ \DOrder_{vd} ] \leq \text{V\_pipeLength}_v \vee \neg \DUsed_{vd} 
+\]
+\[
+\text{O\_reqDischargeRate}[ \DOrder_{vd} ] \leq \text{V\_dischargeRate}_v \vee \neg \DUsed_{vd} 
+\]
+
+In order to ensure that deliveries for a vehicle do not overlap in time and to break symmetries for deliveries, the following constraint ensures
+that deliveries per vehicle are sorted by time and that loading a vehicle only starts after it arrived at a station.
+\[
+\DtUnload_{v,d-1} + \DdTUnloading_{v,d-1} + \DdTtravelFrom_{v,d-1} \leq \DtLoad_{v,d} \vee \neg \DUsed_{vd}
+\]
+
+Similarly, unloading a vehicle can only start after the vehicle arrived at the construction yard and the vehicle has been set up for unloading, which takes $\text{O\_dTSetup}_o$ for order $o$.
+\[
+\DtArrival_{v,d} \leq \DtUnload_{v,d} - \text{O\_dTSetup}[ \DOrder_{v,d} ] \vee \neg \DUsed_{vd}
+\]
+
+In order to avoid unloading multiple vehicles at the same time, the unary constraint can be used. However, since vehicles can be 
+unloaded at the same time at different construction yards, we use a boolean array $\text{AtYard}_o$ per construction yard $o$ to define to which deliveries
+the unary constraint applies to. For the unary constraint, we also need the finish time of all deliveries $\text{D\_tUnloaded}$
+\[
+\text{AtYard}_{o,v,d} = (\DOrder_{v,d} = o) \vee \neg \DUsed_{v,d}
+\]
+\[
+\text{D\_tUnloaded}_{v,d} = \DtUnload_{v,d} + \DdTUnloading_{v,d}
+\]
+\[
+\text{unary}(\DtUnload, \DdTUnloading, \text{D\_tUnloading}, \text{AtYard}_o)
+\]
+
+Similarly, the unary constraint can be used to prevent overlaps of loading the vehicles at stations, using a $\text{AtStation}$ boolean array to encode
+which deliveries are loaded at a station $s$. The loading time $\text{S\_tLoad}_s$ is a constant for each station $s$.
+\[
+\text{AtStation}_{s,v,d} = (\DStation_{v,d} = s) \vee \neg \DUsed_{v,d}
+\]
+\[
+\text{unary}(\DtLoad, \text{S\_tLoad}_s, \text{AtStation}_s)
+\]
+
+\newcommand{\OtotalVolume}{\text{O\_totalVolume}}
+
+Finally, all orders must be fulfilled, i.e., the requested amount of concrete $\OtotalVolume_o$ must be delivered for each order $o$
+\[
+\OPoured_o \geq \OtotalVolume_o
+\]
 
 
+\section{Modeling the Cost}
+
+\newcommand{\ODMap}{\text{ODMap}}
+\newcommand{\OWaste}{\text{O\_Waste}}
+\newcommand{\OPreferred}{\text{O\_Preferred}}
+\newcommand{\OLag}{\text{O\_Lag}}
+\newcommand{\OLateness}{\text{O\_Lateness}}
+\newcommand{\OtUnload}{\text{O\_tUnload}}
+
+In order to calculate the cost of a solution, the waste $\OWaste_o$ for each order $o$, as well as the number of 
+deliveries not delivered from the preferred station $\OPreferred_o$ have to be defined
+\[
+\OWaste_o = \OPoured_o - \OtotalVolume
+\]
+\[
+\OPreferred_{vd} = (\DStation_{vd} \not = \text{O\_preferredStation}[ \DOrder_{vd} ] \wedge \DUsed_{vd}
+\]
+
+The total travel time of all vehicles is simply the sum over $\DdTtravelTo$ and $\DdTtravelFrom$. However, calculating the lateness and the lags of an
+order is more complex. For this, we create a permutation $\ODMap$ of the deliveries so that they are indexed by orders instead of by vehicles.
+The map is used to create a matrix $\OtUnload$ of size $|O| \times |V| \cdot \maxD$, which contains all unload times ordered by time for each order.
+
+First, we enforce that deliveries per order are mapped to the appropriate indices of the orders per vehicle, and that the map describes a proper 
+permutation, i.e., all indices are different. The domain of $\ODMap$ has been set to the interval $[0,\dots,|\ODMap|)$ to enforce that the map only contains
+valid indices into the flat delivery lists.
+\[
+\begin{array}{l}
+(\DOrder[\ODMap_{o,d}] = o \wedge d < \ODeliveries_o) || \\
+(\DOrder[\ODMap_{o,d}] = 0 \wedge d \geq \ODeliveries_o) 
+\end{array}
+\]
+\[
+\text{distinct}(\ODMap)
+\]
+
+Using this map, the matrix $\OtUnload$ is set up to contain the unloading start times of all deliveries and enforced to be sorted by time.
+\[
+\OtUnload_{o,d} = \DtUnload[\ODMap_{o,d}]
+\]
+\[
+\OtUnload_{o,d-1} < \OtUnload_{o,d} \vee d \geq \ODeliveries_o
+\]
+
+Based on the sorted unload times per order $o$, the lateness $\OLateness$ of an order is defined as
+\[
+\OLateness_o = \OtUnload_{o,0} - \OstartTime_o
+\]
+The lag $\OLag_{o,d}$ of a delivery $d$ for an order $o$ is the time difference between the unloading start times of successive deliveries for an order, 
+minus the time it takes to unload the previous delivery.
+\[
+\begin{array}{l}
+(\OLag_{o,d} = \OtUnload_{o,d} - \OtUnload_{o,d-1} - \DdTUnloading[ \ODMap_{o,d} ] \wedge d < \ODeliveries_o) \vee \\
+(\OLag_{o,d} = 0 \wedge d \geq \ODeliveries_o)
+\end{array}
+\]
+For the first delivery of each order, the lag is set to zero.
+\[
+\OLag_{o,0} = 0
+\]
+
+The total cost of a solution can now be modeled as
+\[
+\begin{array}{l l}
+\text{Cost} = & \alpha_1 \cdot \sum \OLateness + \alpha_2 \cdot \sum \OWaste + \alpha_3 \cdot \sum \OPreferred + \alpha_4 \cdot \sum \OLag + \\
+              & \alpha_5 \cdot (\sum \DdTtravelTo + \sum \DdTtravelFrom)
+\end{array}
+\]
 
 
+\section{Evaluation and Improving the Model}
 
+Gist was used to inspect the branching and the values determined by the solver. The ability to print out partial
+solutions and to visualize the branch tree helped debugging the model a lot (e.g., in case Gecode fails when the cost
+variable has not being assigned a single value due to insufficient constaints) and to gain insights into the performance of
+the branchers.
 
-\section{Improving the Model}
+\newcommand{\maxOD}{\text{maxOD}}
+
+The first issue detected was that $\ODMap$ was not sufficiently restricted for unused delivery entries. In order to break symmetries, the following constraint
+was added to enforce an order on the mapping of unused delivery entries per order, and to enforce an order on the
+indices of unused deliveries between subsequent orders, where $\maxOD = |V| \cdot \maxD$, i.e., the maximum number
+of deliveries per order.
+\[
+\ODMap_{o,d-1} < \ODMap_{o,d} \vee d-1 < \ODeliveries_o
+\]
+\[
+\begin{array}{l}
+\ODMap_{o-1,\maxOD - 1} < \ODMap[o, \ODeliveries_o] \, \vee \\
+\ODeliveries_{o-1} = \maxOD - 1 \, \vee \\
+\ODeliveries_o = \maxOD
+\end{array}
+\]
+
 
 
 

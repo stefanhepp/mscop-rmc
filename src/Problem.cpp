@@ -57,9 +57,9 @@ int RMCInput::getMinDeliveries(int order) const
   
   for (int i = 0; i < _vehicles.size(); i++) {
     const Vehicle &v = getVehicle(i);
-    if (v.maxDischargeRate() < o.dischargeRate() || v.pumpLength() < o.requiredPumpLength()) 
+    if (v.maxDischargeRate() < o.dischargeRate() || v.pumpLength() < o.requiredPumpLength() || v.volume(o.maxVolumeAllowed()) == 0) 
       continue;
-    
+      
     if (minCapacity == 0) {
       minCapacity = v.volume(o.maxVolumeAllowed());
     } else {
@@ -67,7 +67,11 @@ int RMCInput::getMinDeliveries(int order) const
     }
   }
   
-  return o.totalVolume() / minCapacity;
+  if (minCapacity == 0) {
+    return -1;
+  }
+  
+  return ((o.totalVolume() - 1) / minCapacity) + 1;
 }
 
 void RMCInput::loadProblem(const char* filename) {

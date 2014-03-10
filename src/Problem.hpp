@@ -35,7 +35,7 @@ public:
   
   virtual ~Order(){}
 
-  std::string name() { return _name; }
+  std::string name() const { return _name; }
   
   int requiredPumpLength() const {return _requiredPumpLength;}
 
